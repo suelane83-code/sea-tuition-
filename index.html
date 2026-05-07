@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>海底补习记(完美数据版)</title>
+    <title>海底补习记(完美导出版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -11,7 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
@@ -108,72 +107,66 @@
             });
           }, [ready, tuitions, currentMonthStr, bills]);
 
-          // 🔥 完美修复版 Excel 导出
-          const exportToExcel = () => {
-            if (typeof XLSX === 'undefined') {
-              alert("⚠️ Excel 插件还在加载中，请稍等几秒或刷新页面再试。");
-              return;
-            }
+          // 🔥 彻底重写：原生 100% 成功率的 CSV 数据导出 (无需任何外置插件)
+          const exportToCSV = () => {
             try {
-              const wb = XLSX.utils.book_new();
-              // 安全函数：如果没数据就给个空行，防止插件报错卡死
-              const safeData = (arr) => arr && arr.length > 0 ? arr : [{ "提示": "暂无数据" }];
+              // 加上 BOM，确保用 Excel 打开时中文不会乱码
+              let csvContent = "\uFEFF"; 
+              
+              const addTable = (title, headers, rows) => {
+                csvContent += title + "\n";
+                csvContent += headers.join(",") + "\n";
+                rows.forEach(row => {
+                  // 处理里面可能有的逗号，加上双引号
+                  const rowStr = row.map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(",");
+                  csvContent += rowStr + "\n";
+                });
+                csvContent += "\n\n";
+              };
 
-              // 1. 整理孩子名单
-              const childData = childrenList.map(c => ({
-                "名字": c.name,
-                "身份": c.type === 'own' ? '儿女' : '侄儿女'
-              }));
-              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(childData)), "孩子名单");
+              // 1. 孩子名单
+              addTable("【1. 孩子名单】", ["名字", "身份"], childrenList.map(c => [c.name, c.type === 'own' ? '儿女' : '侄儿女']));
 
-              // 2. 整理老师名单
-              const teacherData = teachers.map(t => ({ "老师名字": t.name }));
-              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(teacherData)), "老师资料");
+              // 2. 老师名单
+              addTable("【2. 老师资料】", ["老师名字"], teachers.map(t => [t.name]));
 
-              // 3. 整理账单明细
-              const billData = bills.map(b => {
+              // 3. 付款记录
+              const billRows = bills.map(b => {
                 const c = childrenList.find(x => x.id === b.childId);
                 const t = teachers.find(x => x.id === b.teacherId);
-                return {
-                  "月份": b.month,
-                  "学生名字": c ? c.name : '已删除的学生',
-                  "补习老师": t ? t.name : '已删除的老师',
-                  "账单金额 (RM)": parseFloat(b.amount || 0).toFixed(2),
-                  "缴费状态": b.status === 'paid' ? '✅ 已付款' : '❌ 未付款'
-                };
+                return [b.month, c ? c.name : '已删除', t ? t.name : '已删除', parseFloat(b.amount||0).toFixed(2), b.status === 'paid' ? '已付款' : '未付款'];
               });
-              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(billData)), "付款记录");
+              addTable("【3. 付款明细】", ["月份", "学生名字", "补习老师", "账单金额 (RM)", "缴费状态"], billRows);
 
-              // 4. 整理精细打卡记录
-              const attData = [];
+              // 4. 打卡记录
+              const attRows = [];
               attendance.forEach(a => {
                 const tuitionInfo = tuitions.find(t => t.id === a.tuitionId);
-                const cName = childrenList.find(c => c.id === tuitionInfo?.childId)?.name || '未知学生';
-                
+                const cName = childrenList.find(c => c.id === tuitionInfo?.childId)?.name || '未知';
                 if (a.dateRecords) {
                   Object.keys(a.dateRecords).forEach(dateStr => {
-                    attData.push({
-                      "月份": a.month,
-                      "学生名字": cName,
-                      "补习科目": a.subName,
-                      "上课日期": dateStr,
-                      "出勤状态": a.dateRecords[dateStr].status === 'attended' ? '✅ 已补' : '❌ 缺席',
-                      "缺席原因": a.dateRecords[dateStr].reason || '-'
-                    });
+                    const st = a.dateRecords[dateStr];
+                    attRows.push([a.month, cName, a.subName, dateStr, st.status === 'attended' ? '已补' : '缺席', st.reason || '-']);
                   });
                 }
               });
-              // 按照日期排个序
-              attData.sort((a, b) => a["上课日期"].localeCompare(b["上课日期"]));
-              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(attData)), "打卡记录");
+              // 按日期排序
+              attRows.sort((a, b) => a[3].localeCompare(b[3]));
+              addTable("【4. 详细打卡记录】", ["月份", "学生名字", "补习科目", "上课日期", "出勤状态", "缺席原因"], attRows);
 
-              XLSX.writeFile(wb, `海底补习全数据_${currentMonthStr}.xlsx`);
-              // 给个小小的成功提示
-              alert("🎉 导出成功！Excel 文件已开始下载。");
-
+              // 生成文件并触发下载
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", `海底补习数据报表_${currentMonthStr}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              alert("✅ 报表生成成功！已开始下载。");
             } catch (err) {
-              console.error(err);
-              alert("⚠️ 哎呀，导出过程出了点小错：" + err.message);
+              alert("⚠️ 导出失败，请检查浏览器权限：" + err.message);
             }
           };
 
@@ -199,7 +192,7 @@
                 ))}
               </div>
               <div className="max-w-4xl mx-auto p-4 mt-2">
-                {activeTab === 'dashboard' && <Dashboard childrenList={childrenList} tuitions={tuitions} bills={bills} teachers={teachers} currentMonthStr={currentMonthStr} exportFn={exportToExcel} />}
+                {activeTab === 'dashboard' && <Dashboard childrenList={childrenList} tuitions={tuitions} bills={bills} teachers={teachers} currentMonthStr={currentMonthStr} exportFn={exportToCSV} />}
                 {activeTab === 'calendar' && <CalendarView childrenList={childrenList} tuitions={tuitions} />}
                 {activeTab === 'attendance' && <AttendanceManager childrenList={childrenList} tuitions={tuitions} attendance={attendance} currentMonthStr={currentMonthStr} />}
                 {activeTab === 'payments' && <PaymentManager childrenList={childrenList} tuitions={tuitions} teachers={teachers} bills={bills} currentMonthStr={currentMonthStr} />}
@@ -269,8 +262,8 @@
                 <div className="text-center p-4 bg-gray-100 rounded-2xl text-xl font-black">总支出：RM {(ownExp+nephExp).toFixed(2)}</div>
               </div>
 
-              <button onClick={exportFn} className="w-full p-6 bg-green-600 text-white rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-lg active:scale-95">
-                <Icons.Download /> 导出全系统数据到 Excel
+              <button onClick={exportFn} className="w-full p-6 bg-green-600 text-white rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-transform">
+                <Icons.Download /> 生成报表并下载 (Excel支持)
               </button>
             </div>
           );
@@ -346,7 +339,7 @@
           );
         }
 
-        // --- PAYMENT (付款管理) ---
+        // --- PAYMENT ---
         function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr }) {
           const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
           const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
