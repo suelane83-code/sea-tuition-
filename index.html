@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>海底补习记(数据大师版)</title>
+    <title>海底补习记(完全修复版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
-
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -21,7 +19,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- Firebase 配置 (请保持您原本的配置) ---
+        // --- Firebase 配置 ---
         const firebaseConfig = {
           apiKey: "AIzaSyCtw29Kz1An1PjIpI1lFCPUCjOsGGZTaAA",
           authDomain: "seatuition-2.firebaseapp.com",
@@ -61,7 +59,9 @@
           Book: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
           Check: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
           CreditCard: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
-          Download: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+          Edit: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 Z"/></svg>,
+          Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
         };
 
         function App() {
@@ -94,47 +94,44 @@
             return () => unsubs.forEach(fn => fn());
           }, [ready]);
 
-          // Excel 导出逻辑
+          // 自动生成账单
+          useEffect(() => {
+            if (!ready || tuitions.length === 0) return;
+            tuitions.forEach(t => {
+              const billExists = bills.some(b => b.tuitionId === t.id && b.month === currentMonthStr);
+              if (!billExists) {
+                db.collection('bills').add({
+                  tuitionId: t.id, teacherId: t.teacherId, childId: t.childId,
+                  month: currentMonthStr, amount: t.feeAmount, status: 'unpaid', createdAt: Date.now()
+                });
+              }
+            });
+          }, [ready, tuitions, currentMonthStr, bills]);
+
           const exportToExcel = () => {
             const wb = XLSX.utils.book_new();
-            
-            // 1. 孩子表
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(childrenList), "孩子名单");
-            // 2. 老师表
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(teachers), "老师资料");
-            // 3. 账单表
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bills), "付款记录");
-            // 4. 打卡记录 (扁平化处理)
-            const flatAttendance = attendance.map(a => ({
-                月份: a.month,
-                科目: a.subName,
-                记录: JSON.stringify(a.dateRecords)
-            }));
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatAttendance), "打卡记录");
-
-            XLSX.writeFile(wb, `海底补习记数据导出_${currentMonthStr}.xlsx`);
+            const flatAtt = attendance.map(a => ({ 月份: a.month, 科目: a.subName, 详细记录: JSON.stringify(a.dateRecords) }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatAtt), "打卡记录");
+            XLSX.writeFile(wb, `海底补习全数据_${currentMonthStr}.xlsx`);
           };
 
-          if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 正在开启海底数据库...</div>;
+          if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 修复数据连接中...</div>;
 
           const tabs = [
-            { id: 'dashboard', label: '首页', icon: <Icons.Home /> },
-            { id: 'calendar', label: '日历', icon: <Icons.Calendar /> },
-            { id: 'attendance', label: '打卡', icon: <Icons.Check /> },
-            { id: 'payments', label: '付款', icon: <Icons.CreditCard /> },
-            { id: 'tuitions', label: '科目时间', icon: <Icons.Book /> },
-            { id: 'children', label: '孩子', icon: <Icons.Users /> },
+            { id: 'dashboard', label: '首页统计', icon: <Icons.Home /> },
+            { id: 'calendar', label: '补习日历', icon: <Icons.Calendar /> },
+            { id: 'attendance', label: '打卡记事', icon: <Icons.Check /> },
+            { id: 'payments', label: '付款管理', icon: <Icons.CreditCard /> },
+            { id: 'tuitions', label: '科目设置', icon: <Icons.Book /> },
+            { id: 'children', label: '孩子管理', icon: <Icons.Users /> },
           ];
 
           return (
             <div className="min-h-screen pb-20 bg-sky-400">
-              <style>{`
-                body { font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
-                .content-card { background: rgba(255, 255, 255, 0.95); border-radius: 24px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
-                .tab-active { background: #2563eb; color: white; transform: translateY(-3px); }
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-              `}</style>
-              
+              <style>{`body { font-family: 'Segoe UI', sans-serif; } .content-card { background: rgba(255, 255, 255, 0.96); border-radius: 24px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); } .tab-active { background: #2563eb; color: white; transform: translateY(-3px); shadow: 0 4px 10px rgba(0,0,0,0.2); }`}</style>
               <div className="bg-white/90 sticky top-0 z-50 px-2 py-3 flex overflow-x-auto gap-2 shadow-md no-scrollbar">
                 {tabs.map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-shrink-0 flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-lg transition-all ${activeTab === tab.id ? 'tab-active' : 'bg-sky-50 text-sky-800'}`}>
@@ -142,16 +139,8 @@
                   </button>
                 ))}
               </div>
-
               <div className="max-w-4xl mx-auto p-4 mt-2">
-                {activeTab === 'dashboard' && (
-                    <div className="space-y-6">
-                        <Dashboard childrenList={childrenList} tuitions={tuitions} teachers={teachers} currentMonthStr={currentMonthStr} />
-                        <button onClick={exportToExcel} className="w-full p-6 bg-green-600 text-white rounded-3xl font-black text-2xl flex items-center justify-center gap-3 shadow-xl hover:bg-green-700 transition-all active:scale-95">
-                           <Icons.Download /> 导出全系统数据到 Excel
-                        </button>
-                    </div>
-                )}
+                {activeTab === 'dashboard' && <Dashboard childrenList={childrenList} tuitions={tuitions} bills={bills} teachers={teachers} currentMonthStr={currentMonthStr} exportFn={exportToExcel} />}
                 {activeTab === 'calendar' && <CalendarView childrenList={childrenList} tuitions={tuitions} />}
                 {activeTab === 'attendance' && <AttendanceManager childrenList={childrenList} tuitions={tuitions} attendance={attendance} currentMonthStr={currentMonthStr} />}
                 {activeTab === 'payments' && <PaymentManager childrenList={childrenList} tuitions={tuitions} teachers={teachers} bills={bills} currentMonthStr={currentMonthStr} />}
@@ -162,237 +151,141 @@
           );
         }
 
-        // --- DASHBOARD (今日提醒) ---
-        function Dashboard({ childrenList, tuitions, teachers, currentMonthStr }) {
+        // --- DASHBOARD (修复费用统计与提醒) ---
+        function Dashboard({ childrenList, tuitions, bills, teachers, currentMonthStr, exportFn }) {
           const today = new Date();
-          const dow = today.getDay();
-          const iso = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+          const todayIso = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
           
+          // 统计费用
+          const currentMonthBills = bills.filter(b => b.month === currentMonthStr);
+          const unpaidBills = currentMonthBills.filter(b => b.status === 'unpaid');
+          let ownExp = 0; let nephExp = 0;
+          currentMonthBills.forEach(b => {
+             const c = childrenList.find(x => x.id === b.childId);
+             if(c) { if(c.type === 'own') ownExp += parseFloat(b.amount||0); else nephExp += parseFloat(b.amount||0); }
+          });
+
+          // 今日课表
           const todays = [];
           tuitions.forEach(t => {
-            t.subjectList?.forEach(sub => {
+            const list = t.subjectList || [{ name: t.subjects, schedules: [{type:t.scheduleType, dayOfWeek:t.dayOfWeek, time:t.time, customDate:t.customDate, customTime:t.customTime}] }];
+            list.forEach(sub => {
               sub.schedules?.forEach(s => {
-                if ((s.type === 'fixed' && parseInt(s.dayOfWeek) === dow) || (s.type === 'custom' && s.customDate === iso)) {
-                  todays.push({ childId: t.childId, teacherId: t.teacherId, subName: sub.name, time: s.type === 'fixed' ? s.time : s.customTime });
+                if ((s.type === 'fixed' && parseInt(s.dayOfWeek) === today.getDay()) || (s.type === 'custom' && s.customDate === todayIso)) {
+                  todays.push({ childId: t.childId, subName: sub.name, time: s.type === 'fixed' ? s.time : s.customTime });
                 }
               });
             });
           });
 
           return (
-            <div className="bg-yellow-100 border-l-8 border-yellow-500 p-6 rounded-3xl shadow">
-                <h2 className="text-3xl font-black mb-4 text-yellow-900 flex items-center gap-2">🐚 今日课表</h2>
-                {todays.length > 0 ? (
-                  <div className="space-y-3">
-                    {todays.map((it, i) => {
-                      const c = childrenList.find(x => x.id === it.childId);
-                      const t = teachers.find(x => x.id === it.teacherId);
-                      return (
-                        <div key={i} className="bg-white/80 p-4 rounded-xl flex justify-between items-center shadow-sm border border-yellow-200">
-                           <div className="text-xl"><span className="font-black" style={{color:c?.color}}>{c?.name}</span>：{it.subName} ({t?.name})</div>
-                           <div className="font-black text-2xl text-blue-600">⏰ {it.time}</div>
-                        </div>
-                      )
-                    })}
+            <div className="space-y-6">
+              {/* 付款提醒 */}
+              {unpaidBills.length > 0 && today.getDate() >= 5 && (
+                <div className="bg-red-500 text-white p-6 rounded-3xl shadow-xl animate-pulse">
+                   <h2 className="text-2xl font-black">⚠️ 记得付补习费！</h2>
+                   <p className="text-lg">本月还有 {unpaidBills.length} 笔费用未处理。</p>
+                </div>
+              )}
+
+              {/* 今日课表 */}
+              <div className="bg-yellow-100 border-l-8 border-yellow-500 p-6 rounded-3xl shadow">
+                <h2 className="text-2xl font-black text-yellow-900 mb-4">🐚 今日提醒</h2>
+                {todays.length > 0 ? todays.map((it, i) => (
+                  <div key={i} className="bg-white/80 p-3 rounded-xl mb-2 flex justify-between">
+                    <span className="font-bold">{childrenList.find(c=>c.id===it.childId)?.name}：{it.subName}</span>
+                    <span className="text-blue-600 font-black">⏰ {it.time}</span>
                   </div>
-                ) : <p className="text-xl font-bold text-yellow-700">今天没有任何补习哦！🍀</p>}
+                )) : <p className="text-gray-500">今天没有补习。</p>}
+              </div>
+
+              {/* 费用统计卡片 (找回来了!) */}
+              <div className="content-card">
+                <h2 className="text-2xl font-black text-blue-900 mb-6">📊 本月费用分析 ({currentMonthStr})</h2>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-blue-50 p-6 rounded-3xl border-2 border-blue-100">
+                    <div className="text-blue-600 font-bold">👦👧 儿子女儿</div>
+                    <div className="text-3xl font-black text-blue-800">RM {ownExp.toFixed(2)}</div>
+                  </div>
+                  <div className="bg-purple-50 p-6 rounded-3xl border-2 border-purple-100">
+                    <div className="text-purple-600 font-bold">🧑‍🤝‍🧑 侄子侄女</div>
+                    <div className="text-3xl font-black text-purple-800">RM {nephExp.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="text-center p-4 bg-gray-100 rounded-2xl text-xl font-black">总支出：RM {(ownExp+nephExp).toFixed(2)}</div>
+              </div>
+
+              {/* 导出按钮 */}
+              <button onClick={exportFn} className="w-full p-6 bg-green-600 text-white rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-lg active:scale-95">
+                <Icons.Download /> 导出全系统数据到 Excel
+              </button>
             </div>
           );
         }
 
-        // --- ATTENDANCE (核心修改：按日期打卡) ---
+        // --- ATTENDANCE (修复日期显示) ---
         function AttendanceManager({ childrenList, tuitions, attendance, currentMonthStr }) {
-          // 根据排课设置推算本月所有的日期
-          const getDatesForSubject = (subject) => {
-            const [year, month] = currentMonthStr.split('-').map(Number);
-            const daysInMonth = new Date(year, month, 0).getDate();
+          const getDatesForSub = (sub) => {
+            const [y, m] = currentMonthStr.split('-').map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
             const dates = [];
-
-            subject.schedules?.forEach(s => {
+            sub.schedules?.forEach(s => {
               if (s.type === 'fixed') {
-                const targetDow = parseInt(s.dayOfWeek);
                 for (let d = 1; d <= daysInMonth; d++) {
-                  const dateObj = new Date(year, month - 1, d);
-                  if (dateObj.getDay() === targetDow) {
-                    dates.push({ date: `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`, time: s.time });
-                  }
+                  const dobj = new Date(y, m - 1, d);
+                  if (dobj.getDay() === parseInt(s.dayOfWeek)) dates.push(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
                 }
-              } else if (s.type === 'custom') {
-                if (s.customDate.startsWith(currentMonthStr)) {
-                  dates.push({ date: s.customDate, time: s.customTime });
-                }
-              }
+              } else if (s.type === 'custom' && s.customDate.startsWith(currentMonthStr)) dates.push(s.customDate);
             });
-            return dates.sort((a,b) => a.date.localeCompare(b.date));
+            return [...new Set(dates)].sort();
           };
 
-          const handleMark = async (tuitionId, subName, dateStr, currentStatus) => {
-            let nextStatus = currentStatus === 'attended' ? 'missed' : currentStatus === 'missed' ? null : 'attended';
-            let reason = "";
-            if (nextStatus === 'missed') {
-              reason = prompt("请输入无法出席的原因：") || "未注明原因";
-            }
-
-            const key = `${tuitionId}_${subName}`;
-            const record = attendance.find(a => a.attendanceKey === key && a.month === currentMonthStr);
-            const dateRecords = record ? { ...record.dateRecords } : {};
-            
-            if (nextStatus) {
-                dateRecords[dateStr] = { status: nextStatus, reason: reason };
-            } else {
-                delete dateRecords[dateStr];
-            }
-
-            if (record) {
-              await db.collection('attendance').doc(record.id).update({ dateRecords });
-            } else {
-              await db.collection('attendance').add({ attendanceKey: key, tuitionId, subName, month: currentMonthStr, dateRecords });
-            }
+          const handleMark = async (tId, subName, dStr, cur) => {
+            let next = cur === 'attended' ? 'missed' : cur === 'missed' ? null : 'attended';
+            let reason = next === 'missed' ? (prompt("缺席原因：") || "未注明") : "";
+            const key = `${tId}_${subName}`;
+            const rec = attendance.find(a => a.attendanceKey === key && a.month === currentMonthStr);
+            const dr = rec ? { ...rec.dateRecords } : {};
+            if (next) dr[dStr] = { status: next, reason }; else delete dr[dStr];
+            if (rec) await db.collection('attendance').doc(rec.id).update({ dateRecords: dr });
+            else await db.collection('attendance').add({ attendanceKey: key, tuitionId: tId, subName, month: currentMonthStr, dateRecords: dr });
           };
 
           return (
             <div className="content-card">
-              <h2 className="text-3xl font-black mb-6 text-blue-900 border-b-2 pb-2">🐟 打卡记事本 ({currentMonthStr})</h2>
+              <h2 className="text-2xl font-black mb-6 text-blue-900 border-b-2 pb-2">📅 补习打卡记事本</h2>
               {childrenList.map(child => {
                 const childT = tuitions.filter(t => t.childId === child.id);
                 if (!childT.length) return null;
                 return (
-                  <div key={child.id} className="mb-10 border-4 rounded-[40px] overflow-hidden shadow-2xl bg-white" style={{borderColor: child.color}}>
-                    <div className="p-5 text-3xl font-black text-white flex justify-between" style={{backgroundColor: child.color}}>
-                        {child.name}
-                        <span className="text-sm bg-white/30 px-3 py-1 rounded-full self-center">本月课表</span>
+                  <div key={child.id} className="mb-8 border-4 rounded-[32px] overflow-hidden bg-white shadow-lg" style={{borderColor: child.color}}>
+                    <div className="p-4 text-2xl font-black text-white" style={{backgroundColor: child.color}}>{child.name}</div>
+                    <div className="p-4">
+                      {childT.map(t => {
+                         const list = t.subjectList || [{ name: t.subjects, schedules: [{type:t.scheduleType, dayOfWeek:t.dayOfWeek, time:t.time, customDate:t.customDate, customTime:t.customTime}] }];
+                         return list.map(sub => {
+                           const dates = getDatesForSub(sub);
+                           const rec = attendance.find(a => a.attendanceKey === `${t.id}_${sub.name}` && a.month === currentMonthStr);
+                           return (
+                             <div key={sub.name} className="mb-4 border-b pb-4 last:border-0">
+                               <div className="font-bold text-lg mb-2 text-gray-700">📚 {sub.name}</div>
+                               <div className="flex flex-wrap gap-2">
+                                 {dates.map(d => {
+                                   const st = rec?.dateRecords?.[d] || { status: null };
+                                   const bg = st.status === 'attended' ? 'bg-green-500 text-white' : st.status === 'missed' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400';
+                                   return (
+                                     <button key={d} onClick={() => handleMark(t.id, sub.name, d, st.status)} className={`p-2 rounded-xl text-center min-w-[70px] border ${bg}`}>
+                                       <div className="text-[10px]">{d.split('-')[2]}日</div>
+                                       <div className="font-black">{st.status==='attended'?'已补':st.status==='missed'?'缺席':'待补'}</div>
+                                     </button>
+                                   );
+                                 })}
+                               </div>
+                             </div>
+                           )
+                         })
+                      })}
                     </div>
-                    <div className="p-4 space-y-6">
-                      {childT.map(t => (
-                        t.subjectList?.map(sub => {
-                          const dates = getDatesForSubject(sub);
-                          const record = attendance.find(a => a.attendanceKey === `${t.id}_${sub.name}` && a.month === currentMonthStr);
-                          return (
-                            <div key={sub.name} className="border-b pb-4 last:border-0">
-                              <div className="text-2xl font-black text-gray-800 mb-4">📚 {sub.name}</div>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {dates.map(d => {
-                                  const statusObj = record?.dateRecords?.[d.date] || { status: null };
-                                  const bgColor = statusObj.status === 'attended' ? 'bg-green-500' : statusObj.status === 'missed' ? 'bg-red-500' : 'bg-gray-100';
-                                  return (
-                                    <button key={d.date} onClick={() => handleMark(t.id, sub.name, d.date, statusObj.status)} className={`p-3 rounded-2xl text-left border-2 transition-all active:scale-95 ${bgColor} ${statusObj.status ? 'text-white border-transparent' : 'text-gray-500 border-gray-100'}`}>
-                                      <div className="text-xs font-bold opacity-70">{d.date.split('-').slice(1).join('/')}</div>
-                                      <div className="text-lg font-black">{statusObj.status === 'attended' ? '✅ 已补' : statusObj.status === 'missed' ? '❌ 缺席' : '🔘 待补'}</div>
-                                      {statusObj.reason && <div className="text-[10px] mt-1 italic leading-tight">原因: {statusObj.reason}</div>}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              {dates.length === 0 && <p className="text-gray-400 italic">本月无排课...</p>}
-                            </div>
-                          );
-                        })
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }
-
-        // --- 以下为之前的其他组件，保持逻辑一致并根据新架构做了微调 ---
-
-        function CalendarView({ childrenList, tuitions }) {
-          const [viewDate, setViewDate] = useState(new Date());
-          const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-          const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
-          const days = []; for (let i = 0; i < firstDay; i++) days.push(null); for (let i = 1; i <= daysInMonth; i++) days.push(i);
-
-          const getDayEvents = (day) => {
-            if (!day) return [];
-            const d = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-            const dow = d.getDay();
-            const iso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-            const events = [];
-            tuitions.forEach(t => {
-              const child = childrenList.find(c => c.id === t.childId);
-              t.subjectList?.forEach(sub => {
-                sub.schedules?.forEach(s => {
-                  if ((s.type === 'fixed' && parseInt(s.dayOfWeek) === dow) || (s.type === 'custom' && s.customDate === iso)) {
-                    events.push({ child, subName: sub.name, time: s.type === 'fixed' ? s.time : s.customTime });
-                  }
-                });
-              });
-            });
-            return events;
-          };
-
-          return (
-            <div className="content-card">
-              <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-3 bg-blue-100 rounded-xl font-bold">◀</button>
-                <h2 className="text-2xl font-black text-blue-900">{viewDate.getFullYear()}年 {viewDate.getMonth() + 1}月</h2>
-                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-3 bg-blue-100 rounded-xl font-bold">▶</button>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center font-black text-blue-700 mb-2">
-                {['日','一','二','三','四','五','六'].map(d => <div key={d}>{d}</div>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((day, idx) => (
-                  <div key={idx} className={`min-h-[80px] p-1 border rounded-xl ${day ? 'bg-white' : 'bg-transparent border-transparent'}`}>
-                    {day && <div className="text-gray-400 font-bold text-xs">{day}</div>}
-                    {getDayEvents(day).map((ev, i) => (
-                      <div key={i} className="text-[9px] p-0.5 mb-1 rounded text-white font-black truncate" style={{backgroundColor: ev.child?.color}}>
-                        {ev.time} {ev.child?.name}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr }) {
-          const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
-          const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
-          const handleUpload = async (e, id) => {
-            const b64 = await compressImage(e.target.files[0]);
-            await db.collection('bills').doc(id).update({ receiptData: b64 });
-          };
-
-          return (
-            <div className="content-card">
-              <h2 className="text-3xl font-black mb-6 text-blue-900">💰 补习费管理</h2>
-              {teachers.map(teacher => {
-                const tBills = bills.filter(b => b.teacherId === teacher.id && b.month === currentMonthStr);
-                if (!tBills.length) return null;
-                return (
-                  <div key={teacher.id} className="mb-6 p-5 border-4 border-blue-200 rounded-3xl bg-white">
-                    <h3 className="text-xl font-black mb-4">👨‍🏫 {teacher.name} 老师</h3>
-                    {tBills.map(bill => {
-                      const child = childrenList.find(c => c.id === bill.childId);
-                      const tuition = tuitions.find(t => t.id === bill.tuitionId);
-                      return (
-                        <div key={bill.id} className={`p-4 rounded-2xl border-2 mb-3 flex flex-col md:flex-row justify-between items-center ${bill.status==='paid'?'bg-green-50 border-green-200':'bg-red-50 border-red-200'}`}>
-                           <div className="w-full">
-                              <div className="text-xl font-black" style={{color:child?.color}}>{child?.name}</div>
-                              <div className="text-sm font-bold text-gray-400">{tuition?.subjectList?.map(s=>s.name).join(' + ')}</div>
-                              <div className="text-2xl font-black">RM {bill.amount}</div>
-                           </div>
-                           <div className="flex gap-2 mt-4 md:mt-0">
-                              {bill.status === 'paid' ? (
-                                <>
-                                  <span className="text-green-600 font-bold">✅ 已付</span>
-                                  {bill.receiptData && <img src={bill.receiptData} className="w-12 h-12 rounded border" onClick={()=>window.open(bill.receiptData)} />}
-                                  <button onClick={()=>handleUnpay(bill.id)} className="text-xs text-gray-400">撤销</button>
-                                </>
-                              ) : (
-                                <>
-                                  <label className="bg-gray-200 px-4 py-2 rounded-xl cursor-pointer font-bold">单据<input type="file" className="hidden" onChange={e=>handleUpload(e, bill.id)} /></label>
-                                  <button onClick={()=>handlePay(bill.id)} className="bg-red-500 text-white px-6 py-2 rounded-xl font-bold">确认付款</button>
-                                </>
-                              )}
-                           </div>
-                        </div>
-                      )
-                    })}
                   </div>
                 )
               })}
@@ -408,7 +301,7 @@
           });
           const [editId, setEditId] = useState(null);
 
-          const handleSubmit = async (e) => {
+          const handleSave = async (e) => {
             e.preventDefault();
             if (editId) await db.collection('tuitions').doc(editId).update(form);
             else await db.collection('tuitions').add(form);
@@ -423,84 +316,20 @@
               <div className="content-card">
                 <h2 className="text-xl font-black mb-4">1. 添加老师</h2>
                 <div className="flex gap-4">
-                  <input value={teacherName} onChange={e=>setTeacherName(e.target.value)} placeholder="名字" className="flex-1 p-3 border-2 rounded-xl" />
-                  <button onClick={async ()=>{if(teacherName) await db.collection('teachers').add({name: teacherName}); setTeacherName('')}} className="bg-blue-600 text-white px-6 rounded-xl font-bold">添加</button>
+                  <input value={teacherName} onChange={e=>setTeacherName(e.target.value)} placeholder="老师名字" className="flex-1 p-3 border-2 rounded-xl text-xl" />
+                  <button onClick={async ()=>{if(teacherName) await db.collection('teachers').add({name: teacherName}); setTeacherName('')}} className="bg-blue-600 text-white px-8 rounded-xl font-bold">添加</button>
                 </div>
               </div>
-
-              <div className="content-card border-4 border-blue-400">
-                <h2 className="text-2xl font-black mb-6 text-blue-900">2. 配置科目与排课日期</h2>
-                <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="content-card border-4 border-blue-500">
+                <h2 className="text-2xl font-black text-blue-900 mb-6">2. 设定科目与时间</h2>
+                <form onSubmit={handleSave} className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <select required value={form.teacherId} onChange={e=>setForm({...form, teacherId:e.target.value})} className="p-3 border-2 rounded-xl font-bold"><option value="">- 老师 -</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
                     <select required value={form.childId} onChange={e=>setForm({...form, childId:e.target.value})} className="p-3 border-2 rounded-xl font-bold"><option value="">- 孩子 -</option>{childrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                   </div>
-                  <div className="flex gap-4 p-4 bg-yellow-50 rounded-2xl">
+                  <div className="p-4 bg-yellow-50 rounded-2xl flex gap-4">
                     <select value={form.feeType} onChange={e=>setForm({...form, feeType:e.target.value})} className="p-2 border-2 rounded-xl font-bold"><option value="monthly">每月</option><option value="package">配套</option></select>
-                    <input placeholder="总学费 RM" type="number" step="0.01" value={form.feeAmount} onChange={e=>setForm({...form, feeAmount:e.target.value})} className="flex-1 p-2 border-2 rounded-xl font-black text-red-600 text-xl" />
+                    <input placeholder="RM 总费用" type="number" step="0.01" value={form.feeAmount} onChange={e=>setForm({...form, feeAmount:e.target.value})} className="flex-1 p-2 border-2 rounded-xl font-black text-red-600 text-2xl" />
                   </div>
-
                   {form.subjectList.map((sub, sIdx) => (
-                    <div key={sIdx} className="p-5 bg-sky-50 border-2 border-sky-100 rounded-3xl relative">
-                      <button type="button" onClick={()=>setForm({...form, subjectList: form.subjectList.filter((_,i)=>i!==sIdx)})} className="absolute -top-2 -right-2 bg-red-500 text-white w-8 h-8 rounded-full font-bold">X</button>
-                      <input required value={sub.name} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].name=e.target.value; setForm({...form, subjectList: nl})}} placeholder="科目名称 (如：数学)" className="w-full p-3 mb-4 border-2 rounded-xl font-black" />
-                      <div className="space-y-2">
-                        {sub.schedules.map((sc, schIdx) => (
-                          <div key={schIdx} className="flex flex-wrap gap-2 bg-white p-3 rounded-xl border border-sky-100">
-                             <select value={sc.type} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].type=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold"><option value="fixed">每周</option><option value="custom">特定</option></select>
-                             {sc.type==='fixed' ? (
-                               <>
-                                 <select value={sc.dayOfWeek} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].dayOfWeek=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg">{days.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>
-                                 <input type="time" value={sc.time} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].time=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold" />
-                               </>
-                             ) : (
-                               <>
-                                 <input type="date" value={sc.customDate} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customDate=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg" />
-                                 <input type="time" value={sc.customTime} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customTime=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold" />
-                               </>
-                             )}
-                          </div>
-                        ))}
-                        <button type="button" onClick={()=>{const nl=[...form.subjectList]; nl[sIdx].schedules.push({id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}); setForm({...form, subjectList:nl})}} className="text-xs text-blue-600 font-bold">+ 增加上课时间</button>
-                      </div>
-                    </div>
-                  ))}
-                  <button type="button" onClick={()=>setForm({...form, subjectList: [...form.subjectList, { name:'', schedules:[{id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}] }]})} className="w-full py-4 border-2 border-dashed border-sky-300 rounded-2xl font-bold text-sky-700">+ 增加一个科目</button>
-                  <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black text-2xl shadow-xl">保存全部配置</button>
-                </form>
-              </div>
-            </div>
-          );
-        }
-
-        function ChildrenManager({ childrenList }) {
-          const [name, setName] = useState('');
-          const [color, setColor] = useState('#3B82F6');
-          const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
-          return (
-            <div className="space-y-6">
-              <div className="content-card">
-                <h2 className="text-xl font-black mb-4">添加孩子</h2>
-                <div className="flex gap-4 mb-4">
-                  <input value={name} onChange={e=>setName(e.target.value)} placeholder="孩子名字" className="flex-1 p-3 border-2 rounded-xl" />
-                  <button onClick={async ()=>{if(name) await db.collection('children').add({name, color}); setName('')}} className="bg-blue-600 text-white px-8 rounded-xl font-bold">添加</button>
-                </div>
-                <div className="flex gap-2 flex-wrap">{colors.map(c=><div key={c} onClick={()=>setColor(c)} className={`w-10 h-10 rounded-full border-4 cursor-pointer ${color===c?'border-black':'border-transparent'}`} style={{backgroundColor:c}}></div>)}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {childrenList.map(c=>(
-                  <div key={c.id} className="p-5 rounded-[30px] text-white font-black text-xl flex justify-between items-center shadow-lg" style={{backgroundColor:c.color}}>
-                    {c.name}
-                    <button onClick={()=>db.collection('children').doc(c.id).delete()} className="bg-white/20 p-2 rounded-lg text-sm">删除</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+                    <div key={sIdx} className
