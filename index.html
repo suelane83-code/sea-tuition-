@@ -332,4 +332,168 @@
                     <input placeholder="RM 总费用" type="number" step="0.01" value={form.feeAmount} onChange={e=>setForm({...form, feeAmount:e.target.value})} className="flex-1 p-2 border-2 rounded-xl font-black text-red-600 text-2xl" />
                   </div>
                   {form.subjectList.map((sub, sIdx) => (
-                    <div key={sIdx} className
+                    <div key={sIdx} className="p-5 bg-sky-50 border-2 border-sky-100 rounded-3xl relative">
+                      <button type="button" onClick={()=>setForm({...form, subjectList: form.subjectList.filter((_,i)=>i!==sIdx)})} className="absolute -top-2 -right-2 bg-red-500 text-white w-8 h-8 rounded-full font-bold">X</button>
+                      <input required value={sub.name} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].name=e.target.value; setForm({...form, subjectList: nl})}} placeholder="科目名称 (如：华语)" className="w-full p-3 mb-4 border-2 rounded-xl font-black" />
+                      <div className="space-y-2">
+                        {sub.schedules.map((sc, schIdx) => (
+                          <div key={schIdx} className="flex gap-2 bg-white p-2 rounded-xl border border-sky-50">
+                             <select value={sc.type} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].type=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold"><option value="fixed">每周</option><option value="custom">指定</option></select>
+                             {sc.type==='fixed' ? (
+                               <>
+                                 <select value={sc.dayOfWeek} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].dayOfWeek=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg">{days.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>
+                                 <input type="time" value={sc.time} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].time=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold" />
+                               </>
+                             ) : (
+                               <>
+                                 <input type="date" value={sc.customDate} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customDate=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg" />
+                                 <input type="time" value={sc.customTime} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customTime=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 border-2 rounded-lg font-bold" />
+                               </>
+                             )}
+                          </div>
+                        ))}
+                        <button type="button" onClick={()=>{const nl=[...form.subjectList]; nl[sIdx].schedules.push({id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}); setForm({...form, subjectList:nl})}} className="text-xs text-blue-600 font-bold">+ 增加时间段</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={()=>setForm({...form, subjectList:[...form.subjectList, {name:'', schedules:[{id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}]}]})} className="w-full py-4 border-2 border-dashed border-sky-300 rounded-2xl font-bold text-sky-700">+ 增加一个新科目</button>
+                  <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black text-2xl shadow-xl active:scale-95 transition-all">保存全部配置</button>
+                </form>
+              </div>
+              <div className="content-card">
+                <h2 className="text-xl font-black mb-4 text-gray-400">当前已设置列表</h2>
+                {tuitions.map(t => (
+                  <div key={t.id} className="p-4 border-2 mb-3 rounded-2xl flex justify-between items-center bg-gray-50">
+                    <div>
+                      <div className="font-black text-lg" style={{color:childrenList.find(c=>c.id===t.childId)?.color}}>{childrenList.find(c=>c.id===t.childId)?.name}</div>
+                      <div className="text-gray-500">{teachers.find(tr=>tr.id===t.teacherId)?.name}老师 | RM {t.feeAmount}</div>
+                    </div>
+                    <div className="flex gap-2">
+                       <button onClick={()=>{setForm(t); setEditId(t.id); window.scrollTo(0,0)}} className="bg-blue-100 text-blue-600 px-4 py-2 rounded-xl font-bold">修改</button>
+                       <button onClick={async()=>{if(confirm("删除？")) await db.collection('tuitions').doc(t.id).delete()}} className="bg-red-100 text-red-600 px-4 py-2 rounded-xl font-bold">删除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        function CalendarView({ childrenList, tuitions }) {
+          const [v, setV] = useState(new Date());
+          const dim = new Date(v.getFullYear(), v.getMonth()+1, 0).getDate();
+          const fd = new Date(v.getFullYear(), v.getMonth(), 1).getDay();
+          const ds = []; for(let i=0; i<fd; i++) ds.push(null); for(let i=1; i<=dim; i++) ds.push(i);
+          const getE = (d) => {
+            if(!d) return [];
+            const dobj = new Date(v.getFullYear(), v.getMonth(), d);
+            const dow = dobj.getDay();
+            const iso = new Date(dobj.getTime() - (dobj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            const es = [];
+            tuitions.forEach(t => {
+              const list = t.subjectList || [{ name: t.subjects, schedules: [{type:t.scheduleType, dayOfWeek:t.dayOfWeek, time:t.time, customDate:t.customDate, customTime:t.customTime}] }];
+              list.forEach(sub => {
+                sub.schedules?.forEach(s => {
+                  if((s.type==='fixed' && parseInt(s.dayOfWeek)===dow) || (s.type==='custom' && s.customDate===iso)) {
+                    es.push({c:childrenList.find(x=>x.id===t.childId), n:sub.name, t:s.type==='fixed'?s.time:s.customTime});
+                  }
+                });
+              });
+            });
+            return es;
+          };
+          return (
+            <div className="content-card">
+              <div className="flex justify-between mb-4">
+                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()-1, 1))} className="p-2 bg-gray-100 rounded-xl font-bold">上月</button>
+                <h2 className="text-xl font-black">{v.getFullYear()}年 {v.getMonth()+1}月</h2>
+                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()+1, 1))} className="p-2 bg-gray-100 rounded-xl font-bold">下月</button>
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-sky-700 mb-2">
+                {['日','一','二','三','四','五','六'].map(d=><div key={d}>{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {ds.map((d,i)=>(
+                  <div key={i} className={`min-h-[80px] p-1 border rounded-xl ${d?'bg-white':'bg-transparent border-transparent'}`}>
+                    {d && <div className="text-gray-400 text-xs font-bold">{d}</div>}
+                    {getE(d).map((e,idx)=><div key={idx} className="text-[9px] p-0.5 mb-1 rounded text-white font-bold truncate" style={{backgroundColor:e.c?.color}}>{e.t} {e.c?.name}</div>)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr }) {
+          const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
+          const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
+          const handleUpload = async (e, id) => {
+             const b64 = await compressImage(e.target.files[0]);
+             await db.collection('bills').doc(id).update({ receiptData: b64 });
+          };
+          return (
+            <div className="content-card">
+              <h2 className="text-2xl font-black mb-6 text-blue-900">💰 补习费缴费记录</h2>
+              {teachers.map(tr => {
+                const bils = bills.filter(b => b.teacherId === tr.id && b.month === currentMonthStr);
+                if(!bils.length) return null;
+                return (
+                  <div key={tr.id} className="mb-6 p-4 border-4 border-blue-100 rounded-3xl bg-white shadow-sm">
+                    <h3 className="text-xl font-black mb-4">👨‍🏫 {tr.name} 老师</h3>
+                    {bils.map(b => {
+                      const c = childrenList.find(x => x.id === b.childId);
+                      const t = tuitions.find(x => x.id === b.tuitionId);
+                      const subs = t?.subjectList ? t.subjectList.map(s=>s.name).join('+') : (t?.subjects || '补习');
+                      return (
+                        <div key={b.id} className={`p-4 rounded-2xl border-2 mb-3 flex flex-col md:flex-row justify-between items-center ${b.status==='paid'?'bg-green-50 border-green-200':'bg-red-50 border-red-200'}`}>
+                          <div className="w-full">
+                            <div className="text-xl font-black" style={{color:c?.color}}>{c?.name}</div>
+                            <div className="text-sm font-bold text-gray-400">{subs}</div>
+                            <div className="text-2xl font-black">RM {b.amount}</div>
+                          </div>
+                          <div className="flex gap-2 mt-4 md:mt-0">
+                             {b.status === 'paid' ? (
+                               <><span className="text-green-600 font-bold">✅ 已付</span>
+                               {b.receiptData && <img src={b.receiptData} className="w-12 h-12 rounded border" onClick={()=>window.open(b.receiptData)} />}
+                               <button onClick={()=>handleUnpay(b.id)} className="text-xs text-gray-400">撤销</button></>
+                             ) : (
+                               <><label className="bg-gray-200 px-4 py-2 rounded-xl cursor-pointer font-bold">单据<input type="file" className="hidden" onChange={e=>handleUpload(e,b.id)} /></label>
+                               <button onClick={()=>handlePay(b.id)} className="bg-red-500 text-white px-6 py-2 rounded-xl font-bold">付清</button></>
+                             )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          );
+        }
+
+        function ChildrenManager({ childrenList }) {
+          const [n, setN] = useState('');
+          const [c, setC] = useState('#3B82F6');
+          const cols = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+          return (
+            <div className="space-y-6">
+              <div className="content-card">
+                <h2 className="text-xl font-black mb-4 text-blue-900">孩子管理</h2>
+                <div className="flex gap-4 mb-4">
+                  <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="flex-1 p-3 border-2 rounded-xl" />
+                  <button onClick={async ()=>{if(n) await db.collection('children').add({name:n, color:c, type:'own'}); setN('')}} className="bg-blue-600 text-white px-8 rounded-xl font-bold">添加</button>
+                </div>
+                <div className="flex gap-2 flex-wrap">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 cursor-pointer ${c===cl?'border-black':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {childrenList.map(ch=><div key={ch.id} className="p-5 rounded-3xl text-white font-black text-xl flex justify-between items-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=>db.collection('children').doc(ch.id).delete()} className="bg-white/20 p-2 rounded-lg text-sm">删</button></div>)}
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
