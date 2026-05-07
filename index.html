@@ -118,7 +118,7 @@
             XLSX.writeFile(wb, `海底补习全数据_${currentMonthStr}.xlsx`);
           };
 
-          if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 修复数据连接中...</div>;
+          if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 数据连接中...</div>;
 
           const tabs = [
             { id: 'dashboard', label: '首页统计', icon: <Icons.Home /> },
@@ -131,7 +131,7 @@
 
           return (
             <div className="min-h-screen pb-20 bg-sky-400">
-              <style>{`body { font-family: 'Segoe UI', sans-serif; } .content-card { background: rgba(255, 255, 255, 0.96); border-radius: 24px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); } .tab-active { background: #2563eb; color: white; transform: translateY(-3px); shadow: 0 4px 10px rgba(0,0,0,0.2); }`}</style>
+              <style>{`body { font-family: 'Segoe UI', sans-serif; } .content-card { background: rgba(255, 255, 255, 0.96); border-radius: 24px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); } .tab-active { background: #2563eb; color: white; transform: translateY(-3px); shadow: 0 4px 10px rgba(0,0,0,0.2); } .no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
               <div className="bg-white/90 sticky top-0 z-50 px-2 py-3 flex overflow-x-auto gap-2 shadow-md no-scrollbar">
                 {tabs.map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-shrink-0 flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-lg transition-all ${activeTab === tab.id ? 'tab-active' : 'bg-sky-50 text-sky-800'}`}>
@@ -287,7 +287,7 @@
           );
         }
 
-        // --- PAYMENT (修复编辑和删除按钮) ---
+        // --- PAYMENT (付款管理) ---
         function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr }) {
           const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
           const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
@@ -296,7 +296,6 @@
              await db.collection('bills').doc(id).update({ receiptData: b64 });
           };
 
-          // 重新加回的编辑与删除账单功能
           const handleEditBill = async (billId, oldAmount) => {
             const newAmount = prompt("请输入新的金额 (RM):", oldAmount);
             if (newAmount !== null && newAmount !== "" && !isNaN(newAmount)) {
@@ -332,7 +331,6 @@
                               <div className="text-2xl font-black mt-1">RM {b.amount}</div>
                             </div>
                             
-                            {/* 这里是您需要的修改和删除按钮 */}
                             <div className="flex gap-2">
                                <button onClick={() => handleEditBill(b.id, b.amount)} className="p-2 bg-white border rounded-lg text-gray-500 shadow-sm hover:bg-gray-100"><Icons.Edit /></button>
                                <button onClick={() => handleDeleteBill(b.id)} className="p-2 bg-white border rounded-lg text-red-500 shadow-sm hover:bg-red-50"><Icons.Trash /></button>
@@ -359,7 +357,7 @@
           );
         }
 
-        // --- TUITION MANAGER (修复列表展示科目和日期) ---
+        // --- TUITION MANAGER ---
         function TuitionManager({ childrenList, teachers, tuitions }) {
           const [teacherName, setTeacherName] = useState('');
           const [form, setForm] = useState({
@@ -434,7 +432,6 @@
                 </form>
               </div>
 
-              {/* 完善的配置列表：展示科目和日期 */}
               <div className="content-card">
                 <h2 className="text-xl font-black mb-4 text-gray-400">当前已设置列表</h2>
                 {tuitions.map(t => (
@@ -447,7 +444,6 @@
                         {teachers.find(tr=>tr.id===t.teacherId)?.name} 老师 | <span className="text-blue-600">RM {t.feeAmount}</span> ({t.feeType==='monthly'?'每月':'配套'})
                       </div>
                       
-                      {/* 这里把所有的科目和时间全列出来 */}
                       <div className="flex flex-col gap-2">
                         {t.subjectList?.map((s, idx) => (
                           <div key={idx} className="bg-white border border-sky-200 p-2 rounded-xl">
@@ -520,22 +516,58 @@
           );
         }
 
+        // --- CHILDREN MANAGER (恢复了儿女/侄儿下拉菜单及修改功能) ---
         function ChildrenManager({ childrenList }) {
-          const [n, setN] = useState('');
-          const [c, setC] = useState('#3B82F6');
-          const cols = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+          const [form, setForm] = useState({ name: '', type: 'own', color: '#3B82F6' });
+          const [editId, setEditId] = useState(null);
+          const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+          
+          const handleSubmit = async (e) => {
+            e.preventDefault();
+            if (editId) await db.collection('children').doc(editId).update(form);
+            else await db.collection('children').add(form);
+            setForm({ name: '', type: 'own', color: '#3B82F6' }); setEditId(null);
+          };
+
           return (
             <div className="space-y-6">
-              <div className="content-card">
-                <h2 className="text-xl font-black mb-4 text-blue-900">孩子管理</h2>
-                <div className="flex gap-4 mb-4">
-                  <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="flex-1 p-3 border-2 rounded-xl" />
-                  <button onClick={async ()=>{if(n) await db.collection('children').add({name:n, color:c, type:'own'}); setN('')}} className="bg-blue-600 text-white px-8 rounded-xl font-bold">添加</button>
-                </div>
-                <div className="flex gap-2 flex-wrap">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 cursor-pointer ${c===cl?'border-black':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
+              <div className="content-card p-6">
+                <h2 className="text-2xl font-black mb-4 text-blue-900">{editId ? '📝 修改孩子资料' : '➕ 添加孩子'}</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="名字" className="flex-1 p-4 border-2 rounded-xl text-xl font-bold" />
+                    
+                    {/* 找回来的：选择儿女还是侄儿侄女 */}
+                    <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="p-4 border-2 rounded-xl text-xl font-bold text-gray-700">
+                      <option value="own">儿子 / 女儿</option>
+                      <option value="nephew">侄子 / 侄女</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap mb-4">
+                    {colors.map(c => (
+                      <div key={c} onClick={() => setForm({...form, color: c})} className={`w-12 h-12 rounded-full border-4 cursor-pointer transition-transform ${form.color === c ? 'border-black scale-110' : 'border-transparent'}`} style={{backgroundColor: c}}></div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 bg-blue-600 text-white p-4 rounded-xl text-xl font-bold shadow-md active:scale-95">{editId ? '保存修改' : '确认添加'}</button>
+                    {editId && <button type="button" onClick={() => {setEditId(null); setForm({ name: '', type: 'own', color: '#3B82F6' });}} className="p-4 bg-gray-300 rounded-xl text-xl font-bold">取消</button>}
+                  </div>
+                </form>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {childrenList.map(ch=><div key={ch.id} className="p-5 rounded-3xl text-white font-black text-xl flex justify-between items-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=>db.collection('children').doc(ch.id).delete()} className="bg-white/20 p-2 rounded-lg text-sm">删</button></div>)}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {childrenList.map(c => (
+                  <div key={c.id} className="p-5 rounded-3xl text-white flex justify-between items-center shadow-lg" style={{backgroundColor: c.color}}>
+                    <span className="text-2xl font-black">{c.name} <span className="text-sm bg-white/30 px-3 py-1 rounded-full ml-2">{c.type === 'own' ? '儿/女' : '侄/女'}</span></span>
+                    
+                    <div className="flex gap-2">
+                      <button onClick={() => {setForm({name: c.name, type: c.type || 'own', color: c.color}); setEditId(c.id); window.scrollTo(0,0);}} className="bg-white/20 p-2 rounded-lg hover:bg-white/40"><Icons.Edit /></button>
+                      <button onClick={async () => {if(confirm("确定删除这个孩子吗？")) await db.collection('children').doc(c.id).delete();}} className="bg-red-500/80 p-2 rounded-lg hover:bg-red-500"><Icons.Trash /></button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           );
