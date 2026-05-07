@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>海底补习记(数据大师版)</title>
+    <title>海底补习记(完美数据版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -108,14 +108,73 @@
             });
           }, [ready, tuitions, currentMonthStr, bills]);
 
+          // 🔥 完美修复版 Excel 导出
           const exportToExcel = () => {
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(childrenList), "孩子名单");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(teachers), "老师资料");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bills), "付款记录");
-            const flatAtt = attendance.map(a => ({ 月份: a.month, 科目: a.subName, 详细记录: JSON.stringify(a.dateRecords) }));
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flatAtt), "打卡记录");
-            XLSX.writeFile(wb, `海底补习全数据_${currentMonthStr}.xlsx`);
+            if (typeof XLSX === 'undefined') {
+              alert("⚠️ Excel 插件还在加载中，请稍等几秒或刷新页面再试。");
+              return;
+            }
+            try {
+              const wb = XLSX.utils.book_new();
+              // 安全函数：如果没数据就给个空行，防止插件报错卡死
+              const safeData = (arr) => arr && arr.length > 0 ? arr : [{ "提示": "暂无数据" }];
+
+              // 1. 整理孩子名单
+              const childData = childrenList.map(c => ({
+                "名字": c.name,
+                "身份": c.type === 'own' ? '儿女' : '侄儿女'
+              }));
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(childData)), "孩子名单");
+
+              // 2. 整理老师名单
+              const teacherData = teachers.map(t => ({ "老师名字": t.name }));
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(teacherData)), "老师资料");
+
+              // 3. 整理账单明细
+              const billData = bills.map(b => {
+                const c = childrenList.find(x => x.id === b.childId);
+                const t = teachers.find(x => x.id === b.teacherId);
+                return {
+                  "月份": b.month,
+                  "学生名字": c ? c.name : '已删除的学生',
+                  "补习老师": t ? t.name : '已删除的老师',
+                  "账单金额 (RM)": parseFloat(b.amount || 0).toFixed(2),
+                  "缴费状态": b.status === 'paid' ? '✅ 已付款' : '❌ 未付款'
+                };
+              });
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(billData)), "付款记录");
+
+              // 4. 整理精细打卡记录
+              const attData = [];
+              attendance.forEach(a => {
+                const tuitionInfo = tuitions.find(t => t.id === a.tuitionId);
+                const cName = childrenList.find(c => c.id === tuitionInfo?.childId)?.name || '未知学生';
+                
+                if (a.dateRecords) {
+                  Object.keys(a.dateRecords).forEach(dateStr => {
+                    attData.push({
+                      "月份": a.month,
+                      "学生名字": cName,
+                      "补习科目": a.subName,
+                      "上课日期": dateStr,
+                      "出勤状态": a.dateRecords[dateStr].status === 'attended' ? '✅ 已补' : '❌ 缺席',
+                      "缺席原因": a.dateRecords[dateStr].reason || '-'
+                    });
+                  });
+                }
+              });
+              // 按照日期排个序
+              attData.sort((a, b) => a["上课日期"].localeCompare(b["上课日期"]));
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(safeData(attData)), "打卡记录");
+
+              XLSX.writeFile(wb, `海底补习全数据_${currentMonthStr}.xlsx`);
+              // 给个小小的成功提示
+              alert("🎉 导出成功！Excel 文件已开始下载。");
+
+            } catch (err) {
+              console.error(err);
+              alert("⚠️ 哎呀，导出过程出了点小错：" + err.message);
+            }
           };
 
           if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 数据连接中...</div>;
@@ -516,7 +575,6 @@
           );
         }
 
-        // --- CHILDREN MANAGER (恢复了儿女/侄儿下拉菜单及修改功能) ---
         function ChildrenManager({ childrenList }) {
           const [form, setForm] = useState({ name: '', type: 'own', color: '#3B82F6' });
           const [editId, setEditId] = useState(null);
@@ -536,8 +594,6 @@
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="flex flex-col md:flex-row gap-4">
                     <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="名字" className="flex-1 p-4 border-2 rounded-xl text-xl font-bold" />
-                    
-                    {/* 找回来的：选择儿女还是侄儿侄女 */}
                     <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="p-4 border-2 rounded-xl text-xl font-bold text-gray-700">
                       <option value="own">儿子 / 女儿</option>
                       <option value="nephew">侄子 / 侄女</option>
