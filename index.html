@@ -462,4 +462,50 @@
                   <div key={tr.id} className="bg-white p-5 rounded-[32px] border shadow-sm">
                     <h3 className="text-lg font-black text-slate-700 mb-4 flex items-center gap-2">👨‍🏫 {tr.name} 老师</h3>
                     {bils.map(b => (
-                      <div key={b.id} className={`p
+                      <div key={b.id} className={`p-4 rounded-2xl border-2 mb-3 flex justify-between items-center ${b.status==='paid'?'bg-green-50 border-green-200':'bg-rose-50 border-rose-200'}`}>
+                        <div>
+                          <div className="font-black" style={{color:childrenList.find(x=>x.id===b.childId)?.color}}>{childrenList.find(x=>x.id===b.childId)?.name}</div>
+                          <div className="text-xl font-black text-slate-800">RM {b.amount}</div>
+                        </div>
+                        {b.status === 'paid' ? 
+                          <button onClick={()=>handleUnpay(b.id)} className="text-xs text-slate-400 underline">撤销付款</button> :
+                          <button onClick={()=>handlePay(b.id)} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg">确认已付</button>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          );
+        }
+
+        function ChildrenManager({ childrenList, db }) {
+          const [n, setN] = useState('');
+          const [t, setT] = useState('own');
+          const [c, setC] = useState('#3B82F6');
+          const cols = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+          return (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-[32px] border shadow-sm">
+                <h2 className="text-xl font-black text-slate-800 mb-4">添加孩子/侄儿女</h2>
+                <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="w-full p-4 border-2 rounded-2xl mb-4 font-bold" />
+                <div className="flex gap-2 mb-4">
+                  <button onClick={()=>setT('own')} className={`flex-1 p-3 rounded-xl font-bold ${t==='own'?'bg-blue-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>儿子/女儿</button>
+                  <button onClick={()=>setT('nephew')} className={`flex-1 p-3 rounded-xl font-bold ${t==='nephew'?'bg-purple-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>侄子/侄女</button>
+                </div>
+                <div className="flex gap-2 flex-wrap mb-6">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 cursor-pointer ${c===cl?'border-black scale-110':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
+                <button onClick={async ()=>{if(n){await db.collection('children').add({name:n, color:c, type:t});setN('')}}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xl shadow-xl">保存成员</button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {childrenList.map(ch=><div key={ch.id} className="p-5 rounded-[28px] text-white font-black text-lg flex justify-between items-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=>db.collection('children').doc(ch.id).delete()} className="bg-black/20 p-2 rounded-lg text-[8px]">删除</button></div>)}
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
