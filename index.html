@@ -41,4 +41,482 @@
           Lock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
           Unlock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
           Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
-          Settings: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.
+          Settings: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+          Download: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+          Edit: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 Z"/></svg>,
+          Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        };
+
+        function App() {
+          const [ready, setReady] = useState(false);
+          const [activeTab, setActiveTab] = useState('home');
+          const [isAdmin, setIsAdmin] = useState(false);
+          const [currentDate] = useState(new Date());
+          const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
+          const [childrenList, setChildren] = useState([]);
+          const [teachers, setTeachers] = useState([]);
+          const [tuitions, setTuitions] = useState([]);
+          const [bills, setBills] = useState([]);
+          const [attendance, setAttendance] = useState([]);
+
+          useEffect(() => {
+            auth.signInAnonymously();
+            const unsubAuth = auth.onAuthStateChanged(user => { if(user) setReady(true); });
+            return () => unsubAuth();
+          }, []);
+
+          useEffect(() => {
+            if (!ready) return;
+            const unsubs = [
+              db.collection('children').onSnapshot(snap => setChildren(snap.docs.map(d => ({id: d.id, ...d.data()})))),
+              db.collection('teachers').onSnapshot(snap => setTeachers(snap.docs.map(d => ({id: d.id, ...d.data()})))),
+              db.collection('tuitions').onSnapshot(snap => setTuitions(snap.docs.map(d => ({id: d.id, ...d.data()})))),
+              db.collection('bills').onSnapshot(snap => setBills(snap.docs.map(d => ({id: d.id, ...d.data()})))),
+              db.collection('attendance').onSnapshot(snap => setAttendance(snap.docs.map(d => ({id: d.id, ...d.data()})))),
+            ];
+            return () => unsubs.forEach(fn => fn());
+          }, [ready]);
+
+          const handleAdminLogin = () => {
+            if (isAdmin) { setIsAdmin(false); setActiveTab('home'); return; }
+            const pw = prompt("请输入管理员密码：");
+            if (pw === ADMIN_PASSWORD) { setIsAdmin(true); } 
+            else if (pw !== null) { alert("密码错误！"); }
+          };
+
+          const handleExport = () => {
+            let csv = "\uFEFF";
+            const addTable = (title, header, rows) => {
+              csv += `${title}\n${header.join(",")}\n`;
+              rows.forEach(r => csv += r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(",") + "\n");
+              csv += "\n";
+            };
+
+            addTable("【1. 学生名单】", ["姓名", "身份"], childrenList.map(c => [c.name, c.type==='own'?'儿女':'侄儿女']));
+            addTable("【2. 补习配置历史】", ["归属月份", "学生", "老师", "科目", "费用", "类型"], tuitions.map(t => {
+               const cName = childrenList.find(c=>c.id===t.childId)?.name || '未知';
+               const tName = teachers.find(tr=>tr.id===t.teacherId)?.name || '未知';
+               const subs = t.subjectList ? t.subjectList.map(s=>s.name).join('+') : (t.subjects || '旧科目数据');
+               return [t.activeMonth||'未分类', cName, tName, subs, t.feeAmount, t.feeType];
+            }));
+            addTable("【3. 付款记录】", ["月份", "学生", "老师", "金额", "状态"], bills.map(b => [b.month, childrenList.find(c=>c.id===b.childId)?.name, teachers.find(tr=>tr.id===b.teacherId)?.name, b.amount, b.status==='paid'?'已付':'未付']));
+            
+            const attRows = [];
+            attendance.forEach(a => {
+              const cName = childrenList.find(c => c.id === tuitions.find(t=>t.id===a.tuitionId)?.childId)?.name || '未知';
+              if(a.dateRecords) Object.keys(a.dateRecords).forEach(d => {
+                const r = a.dateRecords[d];
+                attRows.push([a.month, cName, a.subName, d, r.status==='attended'?'已补':'缺席', r.reason||'-']);
+              });
+            });
+            addTable("【4. 全历史打卡记录】", ["月份", "学生", "科目", "日期", "状态", "备注"], attRows);
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `海底补习全记录_${currentMonthStr}.csv`;
+            link.click();
+          };
+
+          if (!ready) return <div className="text-2xl text-center p-10 font-bold text-white mt-20">🌊 正在加载系统数据...</div>;
+
+          return (
+            <div className="min-h-screen pb-24 bg-slate-50">
+              <style>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
+              
+              <div className="bg-white border-b sticky top-0 z-50 px-4 py-3 flex justify-between items-center shadow-sm">
+                <h1 className="text-xl font-black text-blue-600 flex items-center gap-1">🐚 海底补习记</h1>
+                <button onClick={handleAdminLogin} className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all ${isAdmin ? 'bg-red-100 text-red-600' : 'bg-blue-600 text-white shadow-lg'}`}>
+                  {isAdmin ? <Icons.Unlock /> : <Icons.Lock />} {isAdmin ? '退出管理' : '管理员登录'}
+                </button>
+              </div>
+
+              <div className="max-w-4xl mx-auto p-4 space-y-6">
+                {activeTab === 'home' && <HomeView childrenList={childrenList} tuitions={tuitions} isAdmin={isAdmin} bills={bills} currentMonthStr={currentMonthStr} teachers={teachers} attendance={attendance} db={db} />}
+                {activeTab === 'calendar' && <CalendarView childrenList={childrenList} tuitions={tuitions} />}
+                {activeTab === 'attendance' && <AttendanceView childrenList={childrenList} tuitions={tuitions} attendance={attendance} currentMonthStr={currentMonthStr} db={db} />}
+                
+                {isAdmin && activeTab === 'payments' && <PaymentManager childrenList={childrenList} tuitions={tuitions} teachers={teachers} bills={bills} currentMonthStr={currentMonthStr} db={db} />}
+                {isAdmin && activeTab === 'tuitions' && <TuitionManager childrenList={childrenList} teachers={teachers} tuitions={tuitions} currentMonthStr={currentMonthStr} db={db} />}
+                {isAdmin && activeTab === 'children' && <ChildrenManager childrenList={childrenList} db={db} />}
+              </div>
+
+              <div className="bg-white/95 backdrop-blur border-t fixed bottom-0 left-0 right-0 p-2 flex justify-around items-center z-50">
+                <NavBtn active={activeTab==='home'} label="首页" icon={<Icons.Home />} onClick={()=>setActiveTab('home')} />
+                <NavBtn active={activeTab==='calendar'} label="日历" icon={<Icons.Calendar />} onClick={()=>setActiveTab('calendar')} />
+                <NavBtn active={activeTab==='attendance'} label="打卡" icon={<Icons.Check />} onClick={()=>setActiveTab('attendance')} />
+                
+                {isAdmin && (
+                  <>
+                    <NavBtn active={activeTab==='payments'} label="付款" icon={<Icons.CreditCard />} onClick={()=>setActiveTab('payments')} />
+                    <NavBtn active={activeTab==='tuitions'} label="科目" icon={<Icons.Settings />} onClick={()=>setActiveTab('tuitions')} />
+                    <NavBtn active={activeTab==='children'} label="管理" icon={<Icons.Users />} onClick={()=>setActiveTab('children')} />
+                    <NavBtn active={false} label="导出" icon={<Icons.Download />} onClick={handleExport} />
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function NavBtn({active, label, icon, onClick}) {
+          return (
+            <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-2xl transition-all ${active ? 'text-blue-600 font-bold scale-110' : 'text-slate-400'}`}>
+              {icon}
+              <span className="text-[10px] mt-1">{label}</span>
+            </button>
+          );
+        }
+
+        // --- 首页视图 ---
+        function HomeView({ childrenList, tuitions, isAdmin, bills, currentMonthStr, teachers, attendance, db }) {
+          const today = new Date();
+          const todayIso = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+          
+          const handleQuickMark = async (tuitionId, subName) => {
+            const key = `${tuitionId}_${subName}`;
+            const rec = attendance.find(a => a.attendanceKey === key && a.month === currentMonthStr);
+            const dr = rec ? { ...rec.dateRecords } : {};
+            dr[todayIso] = { status: 'attended', reason: '' };
+            if (rec) await db.collection('attendance').doc(rec.id).update({ dateRecords: dr });
+            else await db.collection('attendance').add({ attendanceKey: key, tuitionId, subName, month: currentMonthStr, dateRecords: dr });
+            alert("打卡成功！👍");
+          };
+
+          const adminStats = useMemo(() => {
+            if (!isAdmin) return null;
+            let own = 0, neph = 0;
+            const unpaid = bills.filter(b => b.month === currentMonthStr && b.status === 'unpaid');
+            bills.filter(b => b.month === currentMonthStr).forEach(b => {
+              const c = childrenList.find(x => x.id === b.childId);
+              if (c?.type === 'own') own += parseFloat(b.amount || 0);
+              else neph += parseFloat(b.amount || 0);
+            });
+            return { own, neph, unpaidCount: unpaid.length };
+          }, [isAdmin, bills, currentMonthStr, childrenList]);
+
+          const todaysTuitions = [];
+          tuitions.forEach(t => {
+            // 🔥 兼容补丁：没有 activeMonth 的旧数据 (!t.activeMonth) 也会显示
+            if (t.activeMonth === currentMonthStr || t.feeType === 'package' || !t.activeMonth) {
+              // 兼容旧数据结构 (如果没有 subjectList，把外层的转成内层格式)
+              const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+              
+              list.forEach(sub => {
+                sub.schedules?.forEach(s => {
+                  if ((s.type === 'fixed' && parseInt(s.dayOfWeek) === today.getDay()) || (s.type === 'custom' && s.customDate === todayIso)) {
+                    todaysTuitions.push({ tid: t.id, subName: sub.name, childId: t.childId, time: s.type==='fixed'?s.time:s.customTime });
+                  }
+                });
+              });
+            }
+          });
+
+          return (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-[32px] text-white shadow-xl">
+                <h2 className="text-2xl font-black mb-4 flex items-center gap-2">📅 今日补习提醒</h2>
+                {todaysTuitions.length > 0 ? todaysTuitions.map((it, i) => (
+                  <div key={i} className="bg-white/20 backdrop-blur-md p-4 rounded-2xl mb-3 border border-white/30 flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-lg">{childrenList.find(c=>c.id===it.childId)?.name}：{it.subName}</div>
+                      <div className="text-sm opacity-80">⏰ {it.time}</div>
+                    </div>
+                    <button onClick={()=>handleQuickMark(it.tid, it.subName)} className="bg-white text-blue-600 px-6 py-2 rounded-xl font-black shadow-lg active:scale-95 transition-all">
+                      点击打卡
+                    </button>
+                  </div>
+                )) : <p className="opacity-70 italic text-center py-4">今天是个悠闲的休息日 🍀</p>}
+              </div>
+
+              {isAdmin && adminStats && (
+                <div className="space-y-4">
+                  {adminStats.unpaidCount > 0 && today.getDate() >= 5 && (
+                    <div className="bg-rose-500 text-white p-4 rounded-2xl font-bold animate-pulse shadow-lg">
+                      ⚠️ 付款提醒：本月还有 {adminStats.unpaidCount} 笔补习费还没付哦！
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white p-6 rounded-[28px] border-2 border-blue-50 shadow-sm">
+                      <div className="text-blue-500 text-xs font-bold uppercase tracking-wider mb-1">儿子女儿</div>
+                      <div className="text-2xl font-black text-slate-800">RM {adminStats.own.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-[28px] border-2 border-purple-50 shadow-sm">
+                      <div className="text-purple-500 text-xs font-bold uppercase tracking-wider mb-1">侄子侄女</div>
+                      <div className="text-2xl font-black text-slate-800">RM {adminStats.neph.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // --- 打卡视图 ---
+        function AttendanceView({ childrenList, tuitions, attendance, currentMonthStr, db }) {
+          const getDatesForSub = (sub) => {
+            const [y, m] = currentMonthStr.split('-').map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            const dates = [];
+            sub.schedules?.forEach(s => {
+              if (s.type === 'fixed') {
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const dobj = new Date(y, m - 1, d);
+                  if (dobj.getDay() === parseInt(s.dayOfWeek)) dates.push(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+                }
+              } else if (s.type === 'custom' && s.customDate?.startsWith(currentMonthStr)) dates.push(s.customDate);
+            });
+            return [...new Set(dates)].sort();
+          };
+
+          const handleMark = async (tId, subName, dStr, cur) => {
+            let next = cur === 'attended' ? 'missed' : cur === 'missed' ? null : 'attended';
+            let reason = next === 'missed' ? (prompt("请输入无法出席的原因：") || "未注明") : "";
+            const key = `${tId}_${subName}`;
+            const rec = attendance.find(a => a.attendanceKey === key && a.month === currentMonthStr);
+            const dr = rec ? { ...rec.dateRecords } : {};
+            if (next) dr[dStr] = { status: next, reason }; else delete dr[dStr];
+            if (rec) await db.collection('attendance').doc(rec.id).update({ dateRecords: dr });
+            else await db.collection('attendance').add({ attendanceKey: key, tuitionId: tId, subName, month: currentMonthStr, dateRecords: dr });
+          };
+
+          return (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-black text-slate-800">打卡记事本</h2>
+              {childrenList.map(child => {
+                // 🔥 兼容补丁
+                const childT = tuitions.filter(t => t.childId === child.id && (t.activeMonth === currentMonthStr || t.feeType === 'package' || !t.activeMonth));
+                if (!childT.length) return null;
+                return (
+                  <div key={child.id} className="bg-white border-2 rounded-[32px] overflow-hidden shadow-sm" style={{borderColor: child.color}}>
+                    <div className="p-4 text-xl font-bold text-white" style={{backgroundColor: child.color}}>{child.name} 的课程</div>
+                    <div className="p-4 space-y-4">
+                      {childT.map(t => {
+                        const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+                        return list.map(sub => {
+                          const dates = getDatesForSub(sub);
+                          const rec = attendance.find(a => a.attendanceKey === `${t.id}_${sub.name}` && a.month === currentMonthStr);
+                          return (
+                            <div key={sub.name} className="border-b pb-4 last:border-0">
+                              <div className="font-bold text-slate-600 mb-2">📚 {sub.name}</div>
+                              <div className="flex flex-wrap gap-2">
+                                {dates.map(d => {
+                                  const st = rec?.dateRecords?.[d] || { status: null };
+                                  const bg = st.status === 'attended' ? 'bg-green-500 text-white' : st.status === 'missed' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400';
+                                  return (
+                                    <button key={d} onClick={() => handleMark(t.id, sub.name, d, st.status)} className={`p-2 rounded-xl text-center min-w-[64px] border ${bg}`}>
+                                      <div className="text-[10px]">{d.split('-')[2]}日</div>
+                                      <div className="font-black text-xs">{st.status==='attended'?'已补':st.status==='missed'?'缺席':'待补'}</div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          );
+        }
+
+        // --- 科目设置 ---
+        function TuitionManager({ childrenList, teachers, tuitions, currentMonthStr, db }) {
+          const [form, setForm] = useState({
+            teacherId: '', childId: '', feeAmount: '', feeType: 'monthly', activeMonth: currentMonthStr,
+            subjectList: [{ name: '', schedules: [{ id: Math.random(), type: 'fixed', dayOfWeek: '1', time: '14:00', customDate: '', customTime: '14:00' }] }]
+          });
+          const [editId, setEditId] = useState(null);
+
+          const handleSave = async (e) => {
+            e.preventDefault();
+            if (editId) await db.collection('tuitions').doc(editId).update(form);
+            else await db.collection('tuitions').add(form);
+            setForm({ teacherId:'', childId:'', feeAmount:'', feeType:'monthly', activeMonth: currentMonthStr, subjectList:[{ name:'', schedules:[{ id:Math.random(), type:'fixed', dayOfWeek:'1', time:'14:00', customDate:'', customTime:'14:00' }] }] });
+            setEditId(null);
+            alert("配置已存档！");
+          };
+
+          const days = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+
+          // 🔥 兼容补丁排序：防止没有 activeMonth 的旧数据导致报错
+          const sortedTuitions = [...tuitions].sort((a,b) => (b.activeMonth || '').localeCompare(a.activeMonth || ''));
+
+          return (
+            <div className="space-y-6">
+              <div className="bg-blue-600 text-white p-6 rounded-[32px] shadow-xl border-4 border-white">
+                <h2 className="text-2xl font-black mb-4">设定本月科目与时间</h2>
+                <form onSubmit={handleSave} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <select required value={form.teacherId} onChange={e=>setForm({...form, teacherId:e.target.value})} className="p-3 rounded-xl text-slate-800 font-bold"><option value="">- 老师 -</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                    <select required value={form.childId} onChange={e=>setForm({...form, childId:e.target.value})} className="p-3 rounded-xl text-slate-800 font-bold"><option value="">- 孩子 -</option>{childrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="month" value={form.activeMonth} onChange={e=>setForm({...form, activeMonth:e.target.value})} className="flex-1 p-3 rounded-xl text-slate-800 font-bold" />
+                    <input placeholder="RM" type="number" step="0.01" value={form.feeAmount} onChange={e=>setForm({...form, feeAmount:e.target.value})} className="w-24 p-3 rounded-xl text-slate-800 font-black" />
+                  </div>
+                  
+                  {form.subjectList.map((sub, sIdx) => (
+                    <div key={sIdx} className="bg-white/10 p-4 rounded-2xl border border-white/20 relative">
+                      <input required value={sub.name} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].name=e.target.value; setForm({...form, subjectList: nl})}} placeholder="科目名称" className="w-full p-2 rounded-lg text-slate-800 font-bold mb-3" />
+                      {sub.schedules.map((sc, schIdx) => (
+                        <div key={schIdx} className="flex gap-2 mb-2">
+                           <select value={sc.type} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].type=e.target.value; setForm({...form, subjectList: nl})}} className="p-1 rounded bg-white text-slate-800 text-xs font-bold"><option value="fixed">每周</option><option value="custom">特定</option></select>
+                           {sc.type==='fixed' ? (
+                             <><select value={sc.dayOfWeek} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].dayOfWeek=e.target.value; setForm({...form, subjectList: nl})}} className="flex-1 p-1 rounded bg-white text-slate-800 text-xs">{days.map((d,i)=><option key={i} value={i}>{d}</option>)}</select>
+                             <input type="time" value={sc.time} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].time=e.target.value; setForm({...form, subjectList: nl})}} className="w-20 p-1 rounded bg-white text-slate-800 text-xs font-bold" /></>
+                           ) : (
+                             <><input type="date" value={sc.customDate} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customDate=e.target.value; setForm({...form, subjectList: nl})}} className="flex-1 p-1 rounded bg-white text-slate-800 text-xs" />
+                             <input type="time" value={sc.customTime} onChange={e=>{const nl=[...form.subjectList]; nl[sIdx].schedules[schIdx].customTime=e.target.value; setForm({...form, subjectList: nl})}} className="w-20 p-1 rounded bg-white text-slate-800 text-xs font-bold" /></>
+                           )}
+                        </div>
+                      ))}
+                      <button type="button" onClick={()=>{const nl=[...form.subjectList]; nl[sIdx].schedules.push({id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}); setForm({...form, subjectList:nl})}} className="text-[10px] underline">+ 增加时间段</button>
+                    </div>
+                  ))}
+                  <button type="submit" className="w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-xl shadow-lg">确认并存入该月档案</button>
+                </form>
+              </div>
+
+              {/* 已设置列表 */}
+              <div className="bg-white p-6 rounded-[32px] border">
+                <h3 className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-4">当前及历史科目列表</h3>
+                {sortedTuitions.map(t => {
+                  const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+                  
+                  return (
+                    <div key={t.id} className="p-4 border-b last:border-0 flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-blue-500 font-bold">{t.activeMonth || '未指定月份 (旧数据)'}</div>
+                        <div className="font-black text-slate-800">{childrenList.find(c=>c.id===t.childId)?.name} - {list.map(s=>s.name).join(', ')}</div>
+                        <div className="text-[10px] text-slate-400">{teachers.find(tr=>tr.id===t.teacherId)?.name}老师 | RM {t.feeAmount}</div>
+                      </div>
+                      <div className="flex gap-2">
+                         <button onClick={()=>{
+                            setForm({
+                              teacherId: t.teacherId, childId: t.childId, feeAmount: t.feeAmount, feeType: t.feeType || 'monthly', activeMonth: t.activeMonth || currentMonthStr,
+                              subjectList: list
+                            }); 
+                            setEditId(t.id); 
+                            window.scrollTo(0,0)
+                         }} className="p-2 text-blue-600"><Icons.Edit /></button>
+                         <button onClick={async()=>{if(confirm("确定删除？")) await db.collection('tuitions').doc(t.id).delete()}} className="p-2 text-rose-600"><Icons.Trash /></button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        // --- 其他组件 (日历、付款、孩子) ---
+        function CalendarView({ childrenList, tuitions }) {
+          const [v, setV] = useState(new Date());
+          const dim = new Date(v.getFullYear(), v.getMonth()+1, 0).getDate();
+          const fd = new Date(v.getFullYear(), v.getMonth(), 1).getDay();
+          const ds = []; for(let i=0; i<fd; i++) ds.push(null); for(let i=1; i<=dim; i++) ds.push(i);
+          const getE = (d) => {
+            if(!d) return [];
+            const dobj = new Date(v.getFullYear(), v.getMonth(), d);
+            const dow = dobj.getDay();
+            const iso = new Date(dobj.getTime() - (dobj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            const es = [];
+            tuitions.forEach(t => {
+              const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+              list.forEach(sub => {
+                sub.schedules?.forEach(s => {
+                  if((s.type==='fixed' && parseInt(s.dayOfWeek)===dow) || (s.type==='custom' && s.customDate===iso)) {
+                    es.push({c:childrenList.find(x=>x.id===t.childId), n:sub.name, t:s.type==='fixed'?s.time:s.customTime});
+                  }
+                });
+              });
+            });
+            return es;
+          };
+          return (
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border">
+              <div className="flex justify-between items-center mb-6">
+                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()-1, 1))} className="p-3 bg-slate-100 rounded-xl font-bold">◀</button>
+                <h2 className="text-xl font-black text-slate-800">{v.getFullYear()}年 {v.getMonth()+1}月</h2>
+                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()+1, 1))} className="p-3 bg-slate-100 rounded-xl font-bold">▶</button>
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-xs mb-2">
+                {['日','一','二','三','四','五','六'].map(d=><div key={d}>{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {ds.map((d,i)=>(
+                  <div key={i} className={`min-h-[70px] p-1 border rounded-2xl ${d?'bg-white':'bg-transparent border-transparent'}`}>
+                    {d && <div className="text-slate-300 text-xs font-bold">{d}</div>}
+                    {getE(d).map((e,idx)=><div key={idx} className="text-[8px] p-0.5 mb-0.5 rounded text-white font-bold truncate" style={{backgroundColor:e.c?.color}}>{e.t} {e.c?.name}</div>)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr, db }) {
+          const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
+          const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
+          return (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-black text-slate-800">补习费财务管理</h2>
+              {teachers.map(tr => {
+                const bils = bills.filter(b => b.teacherId === tr.id && b.month === currentMonthStr);
+                if(!bils.length) return null;
+                return (
+                  <div key={tr.id} className="bg-white p-5 rounded-[32px] border shadow-sm">
+                    <h3 className="text-lg font-black text-slate-700 mb-4 flex items-center gap-2">👨‍🏫 {tr.name} 老师</h3>
+                    {bils.map(b => (
+                      <div key={b.id} className={`p-4 rounded-2xl border-2 mb-3 flex justify-between items-center ${b.status==='paid'?'bg-green-50 border-green-200':'bg-rose-50 border-rose-200'}`}>
+                        <div>
+                          <div className="font-black" style={{color:childrenList.find(x=>x.id===b.childId)?.color}}>{childrenList.find(x=>x.id===b.childId)?.name}</div>
+                          <div className="text-xl font-black text-slate-800">RM {b.amount}</div>
+                        </div>
+                        {b.status === 'paid' ? 
+                          <button onClick={()=>handleUnpay(b.id)} className="text-xs text-slate-400 underline">撤销付款</button> :
+                          <button onClick={()=>handlePay(b.id)} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg">确认已付</button>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          );
+        }
+
+        function ChildrenManager({ childrenList, db }) {
+          const [n, setN] = useState('');
+          const [t, setT] = useState('own');
+          const [c, setC] = useState('#3B82F6');
+          const cols = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+          return (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-[32px] border shadow-sm">
+                <h2 className="text-xl font-black text-slate-800 mb-4">添加孩子/侄儿女</h2>
+                <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="w-full p-4 border-2 rounded-2xl mb-4 font-bold" />
+                <div className="flex gap-2 mb-4">
+                  <button onClick={()=>setT('own')} className={`flex-1 p-3 rounded-xl font-bold ${t==='own'?'bg-blue-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>儿子/女儿</button>
+                  <button onClick={()=>setT('nephew')} className={`flex-1 p-3 rounded-xl font-bold ${t==='nephew'?'bg-purple-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>侄子/侄女</button>
+                </div>
+                <div className="flex gap-2 flex-wrap mb-6">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 cursor-pointer ${c===cl?'border-black scale-110':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
+                <button onClick={async ()=>{if(n){await db.collection('children').add({name:n, color:c, type:t});setN('')}}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xl shadow-xl">保存成员</button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {childrenList.map(ch=><div key={ch.id} className="p-5 rounded-[28px] text-white font-black text-lg flex justify-between items-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=>db.collection('children').doc(ch.id).delete()} className="bg-black/20 p-2 rounded-lg text-[8px]">删除</button></div>)}
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
