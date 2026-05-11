@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>海底补习记(回播追踪版)</title>
+    <title>海底补习记(云端同步版)</title>
     
-    <!-- 专属贝壳 App 图标设置 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐚</text></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23e0f2fe%22 rx=%2220%22/><text x=%2250%22 y=%2250%22 font-size=%2260%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>🐚</text></svg>">
-    
-    <!-- 手机 App 全屏体验设置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#38bdf8">
@@ -42,7 +39,6 @@
           measurementId: "G-FM41SK8LXH"
         };
         
-        // Ensure Firebase is initialized only once
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -96,7 +92,6 @@
           const [isAdmin, setIsAdmin] = useState(false);
           const [editTuitionId, setEditTuitionId] = useState(null);
 
-          // 记录本地已读的消息数量
           const [lastSeenMsgCount, setLastSeenMsgCount] = useState(() => parseInt(localStorage.getItem('sea_last_seen_msg') || '0', 10));
 
           const [currentDate] = useState(new Date());
@@ -128,7 +123,6 @@
             return () => unsubs.forEach(fn => fn());
           }, [ready]);
 
-          // 当切换到聊天大厅时，更新已读消息数
           useEffect(() => {
             if (activeTab === 'chat') {
               setLastSeenMsgCount(messages.length);
@@ -138,7 +132,6 @@
 
           const unreadCount = Math.max(0, messages.length - lastSeenMsgCount);
 
-          // 自动生成账单
           useEffect(() => {
             if (!ready || tuitions.length === 0) return;
             tuitions.forEach(t => {
@@ -206,7 +199,6 @@
                     <HomeView childrenList={childrenList} tuitions={tuitions} isAdmin={isAdmin} bills={bills} currentMonthStr={currentMonthStr} teachers={teachers} attendance={attendance} db={db} onEditTuition={(tid)=>{setEditTuitionId(tid); setActiveTab('tuitions');}} />
                     <CalendarView childrenList={childrenList} tuitions={tuitions} />
                     
-                    {/* 未读消息置底提醒 (在日历下方) */}
                     {unreadCount > 0 && (
                        <div onClick={()=>{setActiveTab('chat'); window.scrollTo(0,0)}} className="bg-pink-100 border-2 border-pink-300 p-5 rounded-[32px] shadow-sm cursor-pointer hover:bg-pink-200 transition-colors flex justify-between items-center animate-in slide-in-from-bottom">
                          <div>
@@ -227,7 +219,6 @@
                 {isAdmin && activeTab === 'children' && <ChildrenManager childrenList={childrenList} db={db} />}
               </div>
 
-              {/* 固定底栏及署名 */}
               <div className="mt-auto">
                  <div className="text-center text-sm text-slate-400 font-bold py-6 pb-28 opacity-70">
                     This app is made by Suelane, 11/5/2026.
@@ -238,7 +229,6 @@
                      <NavBtn active={activeTab==='home'} label="首页日历" icon={<Icons.Home />} onClick={()=>{setActiveTab('home'); window.scrollTo(0,0)}} />
                      <NavBtn active={activeTab==='attendance'} label="打卡记事" icon={<Icons.Check />} onClick={()=>{setActiveTab('attendance'); window.scrollTo(0,0)}} />
                      <NavBtn active={activeTab==='fees'} label="费用明细" icon={<Icons.FileText />} onClick={()=>{setActiveTab('fees'); window.scrollTo(0,0)}} />
-                     
                      <NavBtn active={activeTab==='chat'} label="交流大厅" icon={<Icons.Message />} badge={activeTab !== 'chat' ? unreadCount : 0} onClick={()=>{setActiveTab('chat'); window.scrollTo(0,0)}} />
                      
                      {isAdmin && (
@@ -268,7 +258,7 @@
           );
         }
 
-        // --- 费用明细视图 (非 Admin 可见) ---
+        // --- 费用明细视图 ---
         function FeesView({ childrenList, tuitions, bills, teachers, currentMonthStr }) {
           const currentBills = bills.filter(b => b.month === currentMonthStr);
           
