@@ -258,7 +258,7 @@
           );
         }
 
-        // --- 费用明细视图 ---
+        // --- 费用明细视图 (非 Admin 可见) ---
         function FeesView({ childrenList, tuitions, bills, teachers, currentMonthStr }) {
           const currentBills = bills.filter(b => b.month === currentMonthStr);
           
@@ -623,20 +623,6 @@
                 </div>
               )}
 
-              {replayNeeded.length > 0 && (
-                <div className="bg-amber-100 border-2 border-amber-300 p-5 rounded-[32px] shadow-sm">
-                   <h2 className="text-amber-800 font-black mb-3 flex items-center gap-2"><Icons.Play /> 📺 待看回播提醒 ({replayNeeded.length})</h2>
-                   <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                      {replayNeeded.map((it, idx) => (
-                        <div key={idx} className="bg-white/80 p-3 rounded-xl flex justify-between items-center text-sm">
-                           <span className="font-bold text-amber-900">{it.child}: {it.date.split('-').slice(1).join('/')} {it.sub}</span>
-                           <span className="text-amber-600 italic text-[10px]">去打卡页标记回播</span>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-              )}
-
               <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-[32px] text-white shadow-xl relative">
                 <h2 className="text-2xl font-black mb-4">📅 今日补习 (待打卡)</h2>
                 {todaysTuitions.length > 0 ? todaysTuitions.map((it, i) => (
@@ -652,6 +638,20 @@
                   </div>
                 )) : <p className="opacity-90 font-bold bg-white/10 p-4 rounded-xl text-center">今天没有漏下的课！🎉</p>}
               </div>
+
+              {replayNeeded.length > 0 && (
+                <div className="bg-amber-100 border-2 border-amber-300 p-5 rounded-[32px] shadow-sm">
+                   <h2 className="text-amber-800 font-black mb-3 flex items-center gap-2"><Icons.Play /> 📺 待看回播提醒 ({replayNeeded.length})</h2>
+                   <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                      {replayNeeded.map((it, idx) => (
+                        <div key={idx} className="bg-white/80 p-3 rounded-xl flex justify-between items-center text-sm">
+                           <span className="font-bold text-amber-900">{it.child}: {it.date.split('-').slice(1).join('/')} {it.sub}</span>
+                           <span className="text-amber-600 italic text-[10px]">去打卡页标记回播</span>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+              )}
 
               {isAdmin && adminStats && (
                 <div className="grid grid-cols-2 gap-4">
@@ -889,115 +889,4 @@
           return (
             <div className="bg-white p-6 rounded-[32px] shadow-sm border">
               <div className="flex justify-between items-center mb-6">
-                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()-1, 1))} className="p-3 bg-slate-100 rounded-xl font-bold">◀</button>
-                <h2 className="text-xl font-black text-slate-800">{v.getFullYear()}年 {v.getMonth()+1}月</h2>
-                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()+1, 1))} className="p-3 bg-slate-100 rounded-xl font-bold">▶</button>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-xs mb-2">
-                {['日','一','二','三','四','五','六'].map(d=><div key={d}>{d}</div>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {ds.map((d,i)=>(
-                  <div key={i} className={`min-h-[70px] p-1 border rounded-2xl ${d?'bg-white':'bg-transparent border-transparent'}`}>
-                    {d && <div className="text-slate-300 text-xs font-bold">{d}</div>}
-                    {getE(d).map((e,idx)=><div key={idx} className="text-[8px] p-0.5 mb-0.5 rounded text-white font-bold truncate" style={{backgroundColor:e.c?.color}}>{e.t} {e.c?.name}</div>)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        function PaymentManager({ childrenList, tuitions, teachers, bills, currentMonthStr, db }) {
-          const handlePay = async (id) => await db.collection('bills').doc(id).update({ status: 'paid' });
-          const handleUnpay = async (id) => await db.collection('bills').doc(id).update({ status: 'unpaid', receiptData: null });
-          const handleUpload = async (e, id) => {
-             const b64 = await compressImage(e.target.files[0]);
-             await db.collection('bills').doc(id).update({ receiptData: b64 });
-          };
-          const handleEditBill = async (billId, oldAmount) => {
-            const newAmount = prompt("请输入新的金额 (RM):", oldAmount || "");
-            if (newAmount !== null && newAmount !== "") {
-              await db.collection('bills').doc(billId).update({ amount: newAmount });
-            }
-          };
-          const handleDeleteBill = async (billId) => {
-            if(confirm("确定要彻底删除这笔账单吗？")) await db.collection('bills').doc(billId).delete();
-          };
-
-          return (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-black text-slate-800">财务管理</h2>
-              {teachers.map(tr => {
-                const bils = bills.filter(b => b.teacherId === tr.id && b.month === currentMonthStr);
-                if(!bils.length) return null;
-                return (
-                  <div key={tr.id} className="bg-white p-5 rounded-[32px] border">
-                    <h3 className="text-lg font-black mb-4">👨‍🏫 {tr.name} 老师</h3>
-                    {bils.map(b => {
-                      const child = childrenList.find(x => x.id === b.childId);
-                      const tInfo = tuitions.find(t => t.id === b.tuitionId);
-                      const subjectsStr = tInfo?.subjectList ? tInfo.subjectList.map(s=>s.name).join(' + ') : (tInfo?.subjects || '补习');
-
-                      return (
-                        <div key={b.id} className={`p-4 rounded-2xl border-2 mb-3 flex flex-col md:flex-row justify-between items-start md:items-center ${b.status==='paid'?'bg-green-50 border-green-200':'bg-rose-50 border-rose-200'}`}>
-                          <div className="w-full flex justify-between items-start">
-                            <div>
-                              <div className="font-black text-xl" style={{color:child?.color || '#94a3b8'}}>{child?.name || '已删除学生'}</div>
-                              <div className="text-sm font-bold text-slate-400">{subjectsStr}</div>
-                              <div className="text-2xl font-black text-slate-800 mt-1">{b.amount ? `RM ${b.amount}` : '待定'}</div>
-                            </div>
-                            <div className="flex gap-2">
-                               <button onClick={() => handleEditBill(b.id, b.amount)} className="p-2 bg-white border rounded-lg text-slate-500 shadow-sm hover:bg-slate-100"><Icons.Edit /></button>
-                               <button onClick={() => handleDeleteBill(b.id)} className="p-2 bg-white border rounded-lg text-rose-500 shadow-sm hover:bg-rose-50"><Icons.Trash /></button>
-                            </div>
-                          </div>
-                          
-                          <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto justify-end border-t pt-4 md:border-t-0 md:pt-0">
-                             {b.status === 'paid' ? (
-                               <><span className="text-green-600 font-bold flex items-center">✅ 已付</span>
-                               {b.receiptData && <img src={b.receiptData} className="w-12 h-12 rounded border" onClick={()=>window.open(b.receiptData)} />}
-                               <button onClick={()=>handleUnpay(b.id)} className="text-xs text-slate-400 underline">撤销</button></>
-                             ) : (
-                               <><label className="bg-slate-200 px-4 py-2 rounded-xl cursor-pointer font-bold text-slate-600">单据<input type="file" className="hidden" onChange={e=>handleUpload(e,b.id)} /></label>
-                               <button onClick={()=>handlePay(b.id)} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg">确认已付</button></>
-                             )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          );
-        }
-
-        function ChildrenManager({ childrenList, db }) {
-          const [n, setN] = useState('');
-          const [t, setT] = useState('own');
-          const [c, setC] = useState('#3B82F6');
-          const cols = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
-          return (
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-[32px] border shadow-sm">
-                <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="w-full p-4 border-2 rounded-2xl mb-4 font-bold text-lg" />
-                <div className="flex gap-2 mb-4">
-                  <button onClick={()=>setT('own')} className={`flex-1 p-3 rounded-xl font-bold ${t==='own'?'bg-blue-600 text-white':'bg-slate-100 text-slate-400'}`}>儿女</button>
-                  <button onClick={()=>setT('nephew')} className={`flex-1 p-3 rounded-xl font-bold ${t==='nephew'?'bg-purple-600 text-white':'bg-slate-100 text-slate-400'}`}>侄儿女</button>
-                </div>
-                <div className="flex gap-2 flex-wrap mb-6">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 ${c===cl?'border-black scale-110':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
-                <button onClick={async ()=>{if(n){await db.collection('children').add({name:n, color:c, type:t});setN('')}}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black">保存名单</button>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {childrenList.map(ch=><div key={ch.id} className="p-4 rounded-[28px] text-white font-black text-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=>db.collection('children').doc(ch.id).delete()} className="block mx-auto mt-2 text-[8px] bg-black/20 p-1 rounded">删除</button></div>)}
-              </div>
-            </div>
-          );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+                <button onClick={()=>setV(new Date(v.getFullYear(), v.getMonth()-1, 1))} className="p-3
