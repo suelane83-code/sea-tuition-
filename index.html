@@ -188,11 +188,9 @@
             <div className="min-h-screen relative bg-slate-50 flex flex-col">
               <style>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
               
-              <div className="bg-white border-b sticky top-0 z-50 px-4 py-3 flex justify-between items-center shadow-sm">
-                <h1 className="text-xl font-black text-blue-600 flex items-center gap-1">🐚 海底补习记</h1>
-                <button onClick={handleAdminLogin} className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all ${isAdmin ? 'bg-red-100 text-red-600' : 'bg-blue-600 text-white shadow-lg'}`}>
-                  {isAdmin ? <Icons.Unlock /> : <Icons.Lock />} {isAdmin ? '退出管理' : '管理员'}
-                </button>
+              {/* 顶部标题栏 (去除原有巨大的管理员按钮) */}
+              <div className="bg-white border-b sticky top-0 z-50 px-4 py-4 flex justify-center items-center shadow-sm">
+                <h1 className="text-2xl font-black text-blue-600 flex items-center gap-2">🐚 海底补习记</h1>
               </div>
 
               <div className="max-w-4xl mx-auto p-4 w-full flex-1">
@@ -221,9 +219,13 @@
                 {isAdmin && activeTab === 'people' && <PeopleManager childrenList={childrenList} teachers={teachers} db={db} />}
               </div>
 
+              {/* 固定底栏及署名与隐藏的Admin登录 */}
               <div className="mt-auto">
-                 <div className="text-center text-sm text-slate-400 font-bold py-6 pb-28 opacity-70">
-                    This app is made by Suelane, 11/5/2026.
+                 <div className="flex flex-col items-center justify-center text-sm text-slate-400 font-bold py-6 pb-28 opacity-70">
+                    <span>This app is made by Suelane, 11/5/2026.</span>
+                    <button onClick={handleAdminLogin} className="mt-2 text-[10px] underline hover:text-blue-500 transition-colors">
+                      {isAdmin ? '🔒 退出管理员模式' : '🔑 管理员入口'}
+                    </button>
                  </div>
                  
                  <div className="bg-white/95 backdrop-blur border-t fixed bottom-0 left-0 right-0 p-2 z-50">
@@ -260,7 +262,7 @@
           );
         }
 
-        // --- 费用明细视图 ---
+        // --- 费用明细视图 (非 Admin 可见) ---
         function FeesView({ childrenList, tuitions, bills, teachers, currentMonthStr }) {
           const currentBills = bills.filter(b => b.month === currentMonthStr && b.status !== 'deleted');
           
@@ -608,6 +610,7 @@
                   if ((s.type === 'fixed' && parseInt(s.dayOfWeek) === today.getDay()) || (s.type === 'custom' && s.customDate === todayIso)) {
                     const rec = attendance.find(a => a.attendanceKey === `${t.id}_${sub.name}` && a.month === currentMonthStr);
                     const status = rec?.dateRecords?.[todayIso]?.status;
+                    // 取消(cancelled)或者已补(attended)的都不显示在首页提醒
                     if (status !== 'attended' && status !== 'cancelled') {
                        todaysTuitions.push({ tid: t.id, subName: sub.name, childId: t.childId, time: s.type==='fixed'?s.time:s.customTime });
                     }
@@ -931,10 +934,10 @@
             <div className="space-y-6">
               <h2 className="text-2xl font-black text-slate-800">财务管理</h2>
               {teachers.map(tr => {
-                const bils = bills.filter(b => b.teacherId === tr.id && b.month === currentMonthStr);
+                const bils = bills.filter(b => b.teacherId === tr.id && b.month === currentMonthStr && b.status !== 'deleted');
                 if(!bils.length) return null;
                 return (
-                  <div key={tr.id} className="bg-white p-5 rounded-[32px] border">
+                  <div key={tr.id} className="bg-white p-5 rounded-[32px] border shadow-sm">
                     <h3 className="text-lg font-black mb-4">👨‍🏫 {tr.name} 老师</h3>
                     {bils.map(b => {
                       const child = childrenList.find(x => x.id === b.childId);
@@ -955,14 +958,18 @@
                             </div>
                           </div>
                           
-                          <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto justify-end border-t pt-4 md:border-t-0 md:pt-0">
+                          <div className="flex items-center gap-3 mt-4 md:mt-0 w-full md:w-auto justify-end border-t pt-4 md:border-t-0 md:pt-0">
                              {b.status === 'paid' ? (
-                               <><span className="text-green-600 font-bold flex items-center">✅ 已付</span>
-                               {b.receiptData && <img src={b.receiptData} className="w-12 h-12 rounded border" onClick={()=>window.open(b.receiptData)} />}
-                               <button onClick={()=>handleUnpay(b.id)} className="text-xs text-slate-400 underline">撤销</button></>
+                               <>
+                                 <span className="text-green-600 font-bold flex items-center gap-1 whitespace-nowrap">✅ 已付</span>
+                                 {b.receiptData && <img src={b.receiptData} className="w-10 h-10 md:w-12 md:h-12 rounded border object-cover shrink-0 cursor-pointer" onClick={()=>window.open(b.receiptData)} />}
+                                 <button onClick={()=>handleUnpay(b.id)} className="text-sm text-slate-400 hover:text-slate-600 underline whitespace-nowrap">撤销付款</button>
+                               </>
                              ) : (
-                               <><label className="bg-slate-200 px-4 py-2 rounded-xl cursor-pointer font-bold text-slate-600">单据<input type="file" className="hidden" onChange={e=>handleUpload(e,b.id)} /></label>
-                               <button onClick={()=>handlePay(b.id)} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg">确认已付</button></>
+                               <>
+                                 <label className="bg-slate-200 px-4 py-2 rounded-xl cursor-pointer font-bold text-slate-600 shrink-0">单据<input type="file" className="hidden" onChange={e=>handleUpload(e,b.id)} /></label>
+                                 <button onClick={()=>handlePay(b.id)} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg shrink-0">确认已付</button>
+                               </>
                              )}
                           </div>
                         </div>
@@ -975,7 +982,7 @@
           );
         }
 
-        function ChildrenManager({ childrenList, db }) {
+        function PeopleManager({ childrenList, teachers, db }) {
           const [n, setN] = useState('');
           const [t, setT] = useState('own');
           const [c, setC] = useState('#3B82F6');
@@ -990,7 +997,7 @@
                 <h2 className="text-xl font-black text-slate-800 mb-4">👨‍🏫 添加补习老师</h2>
                 <div className="flex gap-4 mb-4">
                   <input value={teacherName} onChange={e=>setTeacherName(e.target.value)} placeholder="老师名字" className="flex-1 p-3 border-2 rounded-xl text-lg font-bold" />
-                  <button onClick={async ()=>{if(teacherName) await db.collection('teachers').add({name: teacherName}); setTeacherName('')}} className="bg-slate-800 text-white px-6 rounded-xl font-bold">保存老师</button>
+                  <button onClick={async ()=>{if(teacherName) await db.collection('teachers').add({name: teacherName}); setTeacherName('')}} className="bg-slate-800 text-white px-6 rounded-xl font-bold">保存</button>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
                   {teachers.map(tr => (
@@ -1003,18 +1010,23 @@
               </div>
 
               <div className="bg-white p-6 rounded-[32px] border shadow-sm">
-                <h2 className="text-xl font-black text-slate-800 mb-4">👦👧 添加孩子/侄儿女</h2>
+                <h2 className="text-xl font-black text-slate-800 mb-4">👦👧 添加学生名单</h2>
                 <input value={n} onChange={e=>setN(e.target.value)} placeholder="名字" className="w-full p-4 border-2 rounded-2xl mb-4 font-bold text-lg" />
                 <div className="flex gap-2 mb-4">
                   <button onClick={()=>setT('own')} className={`flex-1 p-3 rounded-xl font-bold ${t==='own'?'bg-blue-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>儿女</button>
                   <button onClick={()=>setT('nephew')} className={`flex-1 p-3 rounded-xl font-bold ${t==='nephew'?'bg-purple-600 text-white shadow-lg':'bg-slate-100 text-slate-400'}`}>侄儿女</button>
                 </div>
                 <div className="flex gap-2 flex-wrap mb-6">{cols.map(cl=><div key={cl} onClick={()=>setC(cl)} className={`w-10 h-10 rounded-full border-4 cursor-pointer transition-transform ${c===cl?'border-black scale-110':'border-transparent'}`} style={{backgroundColor:cl}}></div>)}</div>
-                <button onClick={async ()=>{if(n){await db.collection('children').add({name:n, color:c, type:t});setN('')}}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xl shadow-xl">保存学生名单</button>
+                <button onClick={async ()=>{if(n){await db.collection('children').add({name:n, color:c, type:t});setN('')}}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xl shadow-xl">保存学生</button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {childrenList.map(ch=><div key={ch.id} className="p-4 rounded-[28px] text-white font-black text-center shadow-lg" style={{backgroundColor:ch.color}}>{ch.name}<button onClick={()=> {if(confirm("确定删除这个学生吗？")) db.collection('children').doc(ch.id).delete();}} className="block mx-auto mt-2 text-[10px] bg-black/20 px-2 py-1 rounded">删除</button></div>)}
+                {childrenList.map(ch=><div key={ch.id} className="p-4 rounded-[28px] text-white font-black text-center shadow-lg relative overflow-hidden" style={{backgroundColor:ch.color}}>
+                  <div className="relative z-10">
+                    <div className="text-xl mb-1">{ch.name}</div>
+                    <button onClick={()=> {if(confirm("确定删除这个学生吗？")) db.collection('children').doc(ch.id).delete();}} className="bg-black/20 px-3 py-1 rounded-full text-[10px]">删除</button>
+                  </div>
+                </div>)}
               </div>
             </div>
           );
