@@ -68,8 +68,6 @@
         const Icons = {
           Home: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
           Calendar: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-          Lock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-          Unlock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
           Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
           Settings: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
           Download: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
@@ -83,6 +81,13 @@
           Mic: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>,
           Square: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>,
           Image: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        };
+
+        const getMonthDiff = (m1, m2) => {
+            if(!m1 || !m2) return 0;
+            const [y1, mo1] = m1.split('-').map(Number);
+            const [y2, mo2] = m2.split('-').map(Number);
+            return (y1 - y2) * 12 + (mo1 - mo2);
         };
 
         function App() {
@@ -131,16 +136,34 @@
 
           const unreadCount = Math.max(0, messages.length - lastSeenMsgCount);
 
-          // 自动生成账单逻辑
+          // 自动生成账单逻辑 (适配学期/按月)
           useEffect(() => {
             if (!ready || tuitions.length === 0) return;
             tuitions.forEach(t => {
-              const billExists = bills.some(b => b.tuitionId === t.id && b.month === currentMonthStr);
-              if (!billExists) {
-                db.collection('bills').add({
-                  tuitionId: t.id, teacherId: t.teacherId, childId: t.childId,
-                  month: currentMonthStr, amount: t.feeAmount, status: 'unpaid', createdAt: Date.now()
-                });
+              const startMonth = t.activeMonth || currentMonthStr;
+              const diff = getMonthDiff(currentMonthStr, startMonth);
+
+              let shouldBillThisMonth = false;
+              if (t.feeType === 'package' && t.packageDuration > 0) {
+                  // 按学期收费：每隔 packageDuration 个月收费一次
+                  if (diff >= 0 && diff % parseInt(t.packageDuration) === 0) {
+                      shouldBillThisMonth = true;
+                  }
+              } else {
+                  // 按月收费 (只要当前记录对应这个月)
+                  if (diff === 0 || (!t.activeMonth)) {
+                      shouldBillThisMonth = true;
+                  }
+              }
+
+              if (shouldBillThisMonth) {
+                const billExists = bills.some(b => b.tuitionId === t.id && b.month === currentMonthStr);
+                if (!billExists) {
+                  db.collection('bills').add({
+                    tuitionId: t.id, teacherId: t.teacherId, childId: t.childId,
+                    month: currentMonthStr, amount: t.feeAmount, status: 'unpaid', createdAt: Date.now()
+                  });
+                }
               }
             });
           }, [ready, tuitions, currentMonthStr, bills]);
@@ -188,7 +211,7 @@
             <div className="min-h-screen relative bg-slate-50 flex flex-col">
               <style>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
               
-              {/* 顶部标题栏 (去除原有巨大的管理员按钮) */}
+              {/* 顶部标题栏 */}
               <div className="bg-white border-b sticky top-0 z-50 px-4 py-4 flex justify-center items-center shadow-sm">
                 <h1 className="text-2xl font-black text-blue-600 flex items-center gap-2">🐚 海底补习记</h1>
               </div>
@@ -290,7 +313,7 @@
                          const tuition = tuitions.find(t => t.id === bill.tuitionId);
                          const teacher = teachers.find(t => t.id === bill.teacherId);
                          const subjectsStr = tuition?.subjectList ? tuition.subjectList.map(s=>s.name).join(' + ') : (tuition?.subjects || '补习');
-                         const feeTypeLabel = tuition?.feeType === 'package' ? `配套收费 (${tuition.packageDuration}个月)` : '按月收费';
+                         const feeTypeLabel = tuition?.feeType === 'package' ? `学期收费 (${tuition.packageDuration || 3}个月)` : '按月收费';
 
                          return (
                            <div key={bill.id} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center border border-slate-100">
@@ -603,7 +626,8 @@
 
           const todaysTuitions = [];
           tuitions.forEach(t => {
-            if (t.activeMonth === currentMonthStr || t.feeType === 'package' || !t.activeMonth) {
+            const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(currentMonthStr, t.activeMonth) >= 0 : t.activeMonth === currentMonthStr);
+            if (isActive) {
               const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
               list.forEach(sub => {
                 sub.schedules?.forEach(s => {
@@ -712,8 +736,12 @@
                 💡 循环：待补 ➡️ <span className="text-green-600 font-bold">已补</span> ➡️ <span className="text-rose-600 font-bold">缺席</span> ➡️ <span className="text-purple-600 font-bold">回播</span> ➡️ <span className="text-slate-800 font-bold">取消</span>
               </p>
               {childrenList.map(child => {
-                const childT = tuitions.filter(t => t.childId === child.id && (t.activeMonth === currentMonthStr || t.feeType === 'package' || !t.activeMonth));
+                const childT = tuitions.filter(t => {
+                   const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(currentMonthStr, t.activeMonth) >= 0 : t.activeMonth === currentMonthStr);
+                   return t.childId === child.id && isActive;
+                });
                 if (!childT.length) return null;
+                
                 return (
                   <div key={child.id} className="bg-white border-2 rounded-[32px] overflow-hidden shadow-sm" style={{borderColor: child.color}}>
                     <div className="p-4 text-xl font-bold text-white flex justify-between items-center" style={{backgroundColor: child.color}}>
@@ -764,24 +792,29 @@
 
         function TuitionManager({ childrenList, teachers, tuitions, currentMonthStr, db, editTuitionId, setEditTuitionId }) {
           const [form, setForm] = useState({
-            teacherId: '', childId: '', feeAmount: '', feeType: 'monthly', activeMonth: currentMonthStr,
+            teacherId: '', childId: '', feeAmount: '', feeType: 'monthly', packageDuration: 3, activeMonth: currentMonthStr,
             subjectList: [{ name: '', schedules: [{ id: Math.random(), type: 'fixed', dayOfWeek: '1', time: '14:00', customDate: '', customTime: '14:00' }] }]
           });
+          
           useEffect(() => {
             if (editTuitionId) {
                 const t = tuitions.find(x => x.id === editTuitionId);
                 if (t) {
                    const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
-                   setForm({ teacherId: t.teacherId, childId: t.childId, feeAmount: t.feeAmount, feeType: t.feeType || 'monthly', activeMonth: t.activeMonth || currentMonthStr, subjectList: list });
+                   setForm({ teacherId: t.teacherId, childId: t.childId, feeAmount: t.feeAmount, feeType: t.feeType || 'monthly', packageDuration: t.packageDuration || 3, activeMonth: t.activeMonth || currentMonthStr, subjectList: list });
                 }
             }
           }, [editTuitionId, tuitions, currentMonthStr]);
           
           const handleCopyPrevious = () => {
              const prevMonthStr = `${new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1).getFullYear()}-${String(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1).getMonth() + 1).padStart(2, '0')}`;
-             const prevTuitions = tuitions.filter(t => t.activeMonth === prevMonthStr || !t.activeMonth);
-             if (prevTuitions.length === 0) { alert("没有找到上个月的数据！"); return; }
-             if (confirm(`找到了 ${prevTuitions.length} 条数据，确定复制到本月吗？`)) {
+             
+             // 只复制“按月收费”的课程（按学期的课程会自动延续，不需要复制）
+             const prevTuitions = tuitions.filter(t => (t.activeMonth === prevMonthStr || !t.activeMonth) && t.feeType !== 'package');
+             
+             if (prevTuitions.length === 0) { alert("没有找到上个月的【按月】排课数据！(学期/配套排课会自动在当月显示，无需复制)"); return; }
+             
+             if (confirm(`找到了 ${prevTuitions.length} 条上月的按月排课数据，确定复制到本月吗？`)) {
                  prevTuitions.forEach(t => {
                      const newData = { ...t, activeMonth: currentMonthStr };
                      delete newData.id;
@@ -795,7 +828,7 @@
             e.preventDefault();
             if (editTuitionId) await db.collection('tuitions').doc(editTuitionId).update(form);
             else await db.collection('tuitions').add(form);
-            setForm({ teacherId:'', childId:'', feeAmount:'', feeType:'monthly', activeMonth: currentMonthStr, subjectList:[{ name:'', schedules:[{ id:Math.random(), type:'fixed', dayOfWeek:'1', time:'14:00', customDate:'', customTime:'14:00' }] }] });
+            setForm({ teacherId:'', childId:'', feeAmount:'', feeType:'monthly', packageDuration:3, activeMonth: currentMonthStr, subjectList:[{ name:'', schedules:[{ id:Math.random(), type:'fixed', dayOfWeek:'1', time:'14:00', customDate:'', customTime:'14:00' }] }] });
             setEditTuitionId(null);
             alert("配置已存档！");
           };
@@ -807,17 +840,33 @@
               <div className="bg-blue-600 text-white p-6 rounded-[32px] border-4 border-white shadow-xl">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-black">{editTuitionId ? '📝 修改配置' : '设定科目时间'}</h2>
-                  {!editTuitionId && <button onClick={handleCopyPrevious} type="button" className="text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/40">复制上月排课</button>}
+                  {!editTuitionId && <button onClick={handleCopyPrevious} type="button" className="text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/40">复制上月按月排课</button>}
                 </div>
                 <form onSubmit={handleSave} className="space-y-4">
                   <div className="grid grid-cols-2 gap-2">
                     <select required value={form.teacherId} onChange={e=>setForm({...form, teacherId:e.target.value})} className="p-3 rounded-xl text-slate-800 font-bold"><option value="">- 老师 -</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
                     <select required value={form.childId} onChange={e=>setForm({...form, childId:e.target.value})} className="p-3 rounded-xl text-slate-800 font-bold"><option value="">- 同学 -</option>{childrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                   </div>
+                  
                   <div className="flex gap-2">
                     <input type="month" value={form.activeMonth} onChange={e=>setForm({...form, activeMonth:e.target.value})} className="flex-1 p-3 rounded-xl text-slate-800 font-bold" />
                     <input placeholder="RM (可选)" type="number" step="0.01" value={form.feeAmount} onChange={e=>setForm({...form, feeAmount:e.target.value})} className="w-28 p-3 rounded-xl text-slate-800 font-black" />
                   </div>
+                  
+                  <div className="flex gap-2 bg-white/10 p-2 rounded-xl mb-3">
+                    <select required value={form.feeType} onChange={e=>setForm({...form, feeType:e.target.value})} className="flex-1 p-2 rounded-lg text-slate-800 font-bold bg-white">
+                        <option value="monthly">按月收费</option>
+                        <option value="package">按学期/配套收费</option>
+                    </select>
+                    {form.feeType === 'package' && (
+                        <div className="flex items-center gap-2 bg-white px-3 rounded-lg">
+                           <span className="text-slate-800 font-bold text-sm whitespace-nowrap">学期时长:</span>
+                           <input type="number" min="1" value={form.packageDuration} onChange={e=>setForm({...form, packageDuration: parseInt(e.target.value)||1})} className="w-16 p-1 rounded text-slate-800 font-black text-center outline-none border-b-2 border-slate-200 focus:border-blue-500" />
+                           <span className="text-slate-800 font-bold text-sm whitespace-nowrap">个月</span>
+                        </div>
+                    )}
+                  </div>
+
                   {form.subjectList.map((sub, sIdx) => (
                     <div key={sIdx} className="bg-white/10 p-4 rounded-2xl border border-white/20 relative">
                       <button type="button" onClick={()=>setForm({...form, subjectList: form.subjectList.filter((_,i)=>i!==sIdx)})} className="absolute -top-2 -right-2 bg-red-500 text-white w-8 h-8 rounded-full font-bold shadow">X</button>
@@ -840,7 +889,7 @@
                   <button type="button" onClick={()=>setForm({...form, subjectList:[...form.subjectList, {name:'', schedules:[{id:Math.random(),type:'fixed',dayOfWeek:'1',time:'14:00',customDate:'',customTime:'14:00'}]}]})} className="w-full py-4 border-2 border-dashed border-white/40 rounded-2xl font-bold text-white">+ 增加新科目</button>
                   <div className="flex gap-2">
                     <button type="submit" className="flex-1 py-4 bg-white text-blue-600 rounded-2xl font-black text-xl shadow-lg">确认保存配置</button>
-                    {editTuitionId && <button type="button" onClick={() => { setEditTuitionId(null); setForm({ teacherId:'', childId:'', feeAmount:'', feeType:'monthly', activeMonth: currentMonthStr, subjectList:[{ name:'', schedules:[{ id:Math.random(), type:'fixed', dayOfWeek:'1', time:'14:00', customDate:'', customTime:'14:00' }] }] }); }} className="p-4 bg-white/20 text-white rounded-2xl font-bold">取消</button>}
+                    {editTuitionId && <button type="button" onClick={() => { setEditTuitionId(null); setForm({ teacherId:'', childId:'', feeAmount:'', feeType:'monthly', packageDuration: 3, activeMonth: currentMonthStr, subjectList:[{ name:'', schedules:[{ id:Math.random(), type:'fixed', dayOfWeek:'1', time:'14:00', customDate:'', customTime:'14:00' }] }] }); }} className="p-4 bg-white/20 text-white rounded-2xl font-bold">取消</button>}
                   </div>
                 </form>
               </div>
@@ -849,12 +898,14 @@
                 <h3 className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-4">当前及历史科目列表</h3>
                 {sortedTuitions.map(t => {
                   const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+                  const feeTypeDisplay = t.feeType === 'package' ? `学期/配套 (${t.packageDuration || 3}个月)` : '按月';
+                  
                   return (
                     <div key={t.id} className="p-4 border-b last:border-0 flex justify-between items-center">
                       <div>
                         <div className="text-xs text-blue-500 font-bold">{t.activeMonth || '未指定月份 (旧数据)'}</div>
                         <div className="font-black text-slate-800">{childrenList.find(c=>c.id===t.childId)?.name} - {list.map(s=>s.name).join(', ')}</div>
-                        <div className="text-[10px] text-slate-400">{teachers.find(tr=>tr.id===t.teacherId)?.name}老师 | {t.feeAmount ? `RM ${t.feeAmount}` : '费用待定'}</div>
+                        <div className="text-[10px] text-slate-400">{teachers.find(tr=>tr.id===t.teacherId)?.name}老师 | {feeTypeDisplay} | {t.feeAmount ? `RM ${t.feeAmount}` : '费用待定'}</div>
                       </div>
                       <div className="flex gap-2">
                          <button onClick={()=>{setEditTuitionId(t.id); window.scrollTo(0,0)}} className="p-2 text-blue-600"><Icons.Edit /></button>
@@ -873,6 +924,9 @@
           const dim = new Date(v.getFullYear(), v.getMonth()+1, 0).getDate();
           const fd = new Date(v.getFullYear(), v.getMonth(), 1).getDay();
           const ds = []; for(let i=0; i<fd; i++) ds.push(null); for(let i=1; i<=dim; i++) ds.push(i);
+          
+          const viewMonthStr = `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}`;
+
           const getE = (d) => {
             if(!d) return [];
             const dobj = new Date(v.getFullYear(), v.getMonth(), d);
@@ -880,14 +934,17 @@
             const iso = new Date(dobj.getTime() - (dobj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
             const es = [];
             tuitions.forEach(t => {
-              const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
-              list.forEach(sub => {
-                sub.schedules?.forEach(s => {
-                  if((s.type==='fixed' && parseInt(s.dayOfWeek)===dow) || (s.type==='custom' && s.customDate===iso)) {
-                    es.push({c:childrenList.find(x=>x.id===t.childId), n:sub.name, t:s.type==='fixed'?s.time:s.customTime});
-                  }
+              const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(viewMonthStr, t.activeMonth) >= 0 : t.activeMonth === viewMonthStr);
+              if (isActive) {
+                const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
+                list.forEach(sub => {
+                  sub.schedules?.forEach(s => {
+                    if((s.type==='fixed' && parseInt(s.dayOfWeek)===dow) || (s.type==='custom' && s.customDate===iso)) {
+                      es.push({c:childrenList.find(x=>x.id===t.childId), n:sub.name, t:s.type==='fixed'?s.time:s.customTime});
+                    }
+                  });
                 });
-              });
+              }
             });
             return es;
           };
