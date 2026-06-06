@@ -136,30 +136,32 @@
 
           const unreadCount = Math.max(0, messages.length - lastSeenMsgCount);
 
-          // 自动生成账单逻辑 (适配学期/按月)
+          // 自动生成账单逻辑 (适配学期/按月，并解决重复生成问题)
           useEffect(() => {
             if (!ready || tuitions.length === 0) return;
             tuitions.forEach(t => {
               const startMonth = t.activeMonth || currentMonthStr;
               const diff = getMonthDiff(currentMonthStr, startMonth);
 
+              if (diff < 0) return; // 还没到开始月份的课，跳过账单生成
+
               let shouldBillThisMonth = false;
               if (t.feeType === 'package' && t.packageDuration > 0) {
                   // 按学期收费：每隔 packageDuration 个月收费一次
-                  if (diff >= 0 && diff % parseInt(t.packageDuration) === 0) {
+                  if (diff % parseInt(t.packageDuration) === 0) {
                       shouldBillThisMonth = true;
                   }
               } else {
-                  // 按月收费 (只要当前记录对应这个月)
-                  if (diff === 0 || (!t.activeMonth)) {
-                      shouldBillThisMonth = true;
-                  }
+                  // 按月收费: 既然 diff >= 0，代表每个月都需要收费
+                  shouldBillThisMonth = true;
               }
 
               if (shouldBillThisMonth) {
-                const billExists = bills.some(b => b.tuitionId === t.id && b.month === currentMonthStr);
+                // 生成唯一 ID 防止多次重复写入
+                const billId = `bill_${t.id}_${currentMonthStr}`;
+                const billExists = bills.some(b => b.id === billId || (b.tuitionId === t.id && b.month === currentMonthStr));
                 if (!billExists) {
-                  db.collection('bills').add({
+                  db.collection('bills').doc(billId).set({
                     tuitionId: t.id, teacherId: t.teacherId, childId: t.childId,
                     month: currentMonthStr, amount: t.feeAmount, status: 'unpaid', createdAt: Date.now()
                   });
@@ -626,7 +628,8 @@
 
           const todaysTuitions = [];
           tuitions.forEach(t => {
-            const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(currentMonthStr, t.activeMonth) >= 0 : t.activeMonth === currentMonthStr);
+            // 新逻辑：只要当前月份 >= 设定月份，排课就会一直生效（无限延续）
+            const isActive = (!t.activeMonth) || getMonthDiff(currentMonthStr, t.activeMonth) >= 0;
             if (isActive) {
               const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
               list.forEach(sub => {
@@ -737,7 +740,7 @@
               </p>
               {childrenList.map(child => {
                 const childT = tuitions.filter(t => {
-                   const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(currentMonthStr, t.activeMonth) >= 0 : t.activeMonth === currentMonthStr);
+                   const isActive = (!t.activeMonth) || getMonthDiff(currentMonthStr, t.activeMonth) >= 0;
                    return t.childId === child.id && isActive;
                 });
                 if (!childT.length) return null;
@@ -806,24 +809,6 @@
             }
           }, [editTuitionId, tuitions, currentMonthStr]);
           
-          const handleCopyPrevious = () => {
-             const prevMonthStr = `${new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1).getFullYear()}-${String(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1).getMonth() + 1).padStart(2, '0')}`;
-             
-             // 只复制“按月收费”的课程（按学期的课程会自动延续，不需要复制）
-             const prevTuitions = tuitions.filter(t => (t.activeMonth === prevMonthStr || !t.activeMonth) && t.feeType !== 'package');
-             
-             if (prevTuitions.length === 0) { alert("没有找到上个月的【按月】排课数据！(学期/配套排课会自动在当月显示，无需复制)"); return; }
-             
-             if (confirm(`找到了 ${prevTuitions.length} 条上月的按月排课数据，确定复制到本月吗？`)) {
-                 prevTuitions.forEach(t => {
-                     const newData = { ...t, activeMonth: currentMonthStr };
-                     delete newData.id;
-                     db.collection('tuitions').add(newData);
-                 });
-                 alert("复制成功！");
-             }
-          };
-
           const handleSave = async (e) => {
             e.preventDefault();
             if (editTuitionId) await db.collection('tuitions').doc(editTuitionId).update(form);
@@ -840,7 +825,6 @@
               <div className="bg-blue-600 text-white p-6 rounded-[32px] border-4 border-white shadow-xl">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-black">{editTuitionId ? '📝 修改配置' : '设定科目时间'}</h2>
-                  {!editTuitionId && <button onClick={handleCopyPrevious} type="button" className="text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/40">复制上月按月排课</button>}
                 </div>
                 <form onSubmit={handleSave} className="space-y-4">
                   <div className="grid grid-cols-2 gap-2">
@@ -895,21 +879,29 @@
               </div>
 
               <div className="bg-white p-6 rounded-[32px] border shadow-sm">
-                <h3 className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-4">当前及历史科目列表</h3>
+                <h3 className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-4">所有排课列表 (自动无限延续)</h3>
+                <p className="text-[10px] text-slate-500 mb-4 bg-blue-50 p-2 rounded border border-blue-100">
+                  💡 提示：您已经不需要在每月1号手动复制排课。只要下方有记录，系统就会在每个月自动生成账单和打卡日历！如果想停止排课，直接点击右侧的垃圾桶 🗑️ 删除即可。
+                </p>
                 {sortedTuitions.map(t => {
                   const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
                   const feeTypeDisplay = t.feeType === 'package' ? `学期/配套 (${t.packageDuration || 3}个月)` : '按月';
+                  const diff = getMonthDiff(currentMonthStr, t.activeMonth);
                   
                   return (
                     <div key={t.id} className="p-4 border-b last:border-0 flex justify-between items-center">
                       <div>
-                        <div className="text-xs text-blue-500 font-bold">{t.activeMonth || '未指定月份 (旧数据)'}</div>
+                        <div className="text-xs text-blue-500 font-bold">
+                           当前周期: {currentMonthStr} <span className="text-slate-400 font-normal ml-1">(设于 {t.activeMonth || '旧数据'})</span>
+                           {diff < 0 && <span className="text-amber-500 ml-2">● 尚未开始</span>}
+                           {diff >= 0 && <span className="text-green-500 ml-2">● 生效中</span>}
+                        </div>
                         <div className="font-black text-slate-800">{childrenList.find(c=>c.id===t.childId)?.name} - {list.map(s=>s.name).join(', ')}</div>
                         <div className="text-[10px] text-slate-400">{teachers.find(tr=>tr.id===t.teacherId)?.name}老师 | {feeTypeDisplay} | {t.feeAmount ? `RM ${t.feeAmount}` : '费用待定'}</div>
                       </div>
                       <div className="flex gap-2">
                          <button onClick={()=>{setEditTuitionId(t.id); window.scrollTo(0,0)}} className="p-2 text-blue-600"><Icons.Edit /></button>
-                         <button onClick={async()=>{if(confirm("确定删除？")) await db.collection('tuitions').doc(t.id).delete()}} className="p-2 text-rose-600"><Icons.Trash /></button>
+                         <button onClick={async()=>{if(confirm("确定永久删除并停止这门排课吗？")) await db.collection('tuitions').doc(t.id).delete()}} className="p-2 text-rose-600"><Icons.Trash /></button>
                       </div>
                     </div>
                   )
@@ -934,7 +926,7 @@
             const iso = new Date(dobj.getTime() - (dobj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
             const es = [];
             tuitions.forEach(t => {
-              const isActive = (!t.activeMonth) || (t.feeType === 'package' ? getMonthDiff(viewMonthStr, t.activeMonth) >= 0 : t.activeMonth === viewMonthStr);
+              const isActive = (!t.activeMonth) || getMonthDiff(viewMonthStr, t.activeMonth) >= 0;
               if (isActive) {
                 const list = t.subjectList || [{ name: t.subjects || '旧科目', schedules: [{type:t.scheduleType||'fixed', dayOfWeek:t.dayOfWeek||'1', time:t.time||'14:00', customDate:t.customDate, customTime:t.customTime}] }];
                 list.forEach(sub => {
